@@ -3,7 +3,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'membership_recharge_page.dart'; // KEY CHANGE: 引入新页面
+import 'creation_store_page.dart'; // KEY CHANGE: 引入新页面
+import 'membership_recharge_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -89,7 +90,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 _buildTopBar(),
                 const SizedBox(height: 20),
-                _buildMenuButtons(),
+                _buildMenuButtons(), // This method is now updated
                 const SizedBox(height: 20),
                 _buildBanner(),
                 const SizedBox(height: 24),
@@ -119,6 +120,55 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildMenuButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          // KEY CHANGE: 将“开始创作”按钮用 GestureDetector 包裹以添加点击事件
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CreationStorePage(),
+                ),
+              );
+            },
+            child: _buildMenuButton(Icons.add_circle, '开始创作'),
+          ),
+          _buildMenuButton(Icons.pets, '我的宠物'),
+          _buildMenuButton(Icons.photo_library, '每日写真'),
+          _buildMenuButton(Icons.back_hand, '偷只小猫'),
+        ],
+      ),
+    );
+  }
+
+  // --- 其他 _build* 方法保持不变 ---
+
+  // _buildMenuButton 辅助方法本身保持不变
+  Widget _buildMenuButton(IconData icon, String label) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.25),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
@@ -138,7 +188,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          // KEY CHANGE: 将充值部分用 InkWell 包裹，使其可点击
           InkWell(
             onTap: () {
               Navigator.push(
@@ -176,22 +225,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  // --- 其他 _build* 方法保持不变 ---
-  Widget _buildMenuButtons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildMenuButton(Icons.add_circle, '开始创作'),
-          _buildMenuButton(Icons.pets, '我的宠物'),
-          _buildMenuButton(Icons.photo_library, '每日写真'),
-          _buildMenuButton(Icons.back_hand, '偷只小猫'),
         ],
       ),
     );
@@ -287,26 +320,6 @@ class _HomePageState extends State<HomePage> {
         color: _currentPage == index ? Colors.white : Colors.white54,
         borderRadius: BorderRadius.circular(12),
       ),
-    );
-  }
-
-  Widget _buildMenuButton(IconData icon, String label) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.25),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: Colors.white, size: 28),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
-        ),
-      ],
     );
   }
 }

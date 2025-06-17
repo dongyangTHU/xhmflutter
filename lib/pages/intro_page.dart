@@ -1,8 +1,12 @@
+// lib/pages/intro_page.dart
+
 import 'package:flutter/material.dart';
+import 'creation_store_page.dart'; // KEY CHANGE: 引入新页面
 
 class IntroPage extends StatelessWidget {
   const IntroPage({super.key});
 
+  // 这个辅助 Widget 本身保持不变
   Widget _buildMenuButton(IconData icon, String label) {
     return Column(
       children: [
@@ -57,7 +61,18 @@ class IntroPage extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildMenuButton(Icons.add_circle, '开始创作'),
+                    // KEY CHANGE: 将“开始创作”按钮用 GestureDetector 包裹以添加点击事件
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CreationStorePage(),
+                          ),
+                        );
+                      },
+                      child: _buildMenuButton(Icons.add_circle, '开始创作'),
+                    ),
                     _buildMenuButton(Icons.pets, '我的宠物'),
                     _buildMenuButton(Icons.photo_library, '每日写真'),
                     _buildMenuButton(Icons.back_hand, '偷只小猫'),
@@ -71,7 +86,7 @@ class IntroPage extends StatelessWidget {
                   Icon(Icons.keyboard_arrow_up, color: Colors.white, size: 30),
                 ],
               ),
-              const SizedBox(height: 80), // 增加底部空间，防止被导航栏遮挡
+              const SizedBox(height: 80),
             ],
           ),
         ),

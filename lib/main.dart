@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
-import 'dart:ui'; // 引入dart:ui库以使用ImageFilter
+// lib/main.dart
 
-// 引入分离出去的页面文件
+import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'pages/home_page.dart';
 import 'pages/intro_page.dart';
 import 'pages/profile_page.dart';
+import 'pages/creation_store_page.dart'; // KEY CHANGE: 引入新页面
 
 void main() {
   runApp(const MyApp());
@@ -33,7 +34,6 @@ class MainContainer extends StatefulWidget {
 
 class _MainContainerState extends State<MainContainer> {
   late final PageController _pageController;
-
   int _bottomNavIndex = 0;
 
   @override
@@ -49,8 +49,13 @@ class _MainContainerState extends State<MainContainer> {
   }
 
   void _onItemTapped(int tappedIndex) {
+    // KEY CHANGE: 点击“创作”(索引1)时，跳转到新页面
     if (tappedIndex == 1) {
-      return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const CreationStorePage()),
+      );
+      return; // 不更新底部导航栏状态，保持当前页的高亮
     }
 
     if (tappedIndex == 2) {
@@ -69,7 +74,6 @@ class _MainContainerState extends State<MainContainer> {
     }
 
     int targetPage = tappedIndex;
-
     _pageController.animateToPage(
       targetPage,
       duration: const Duration(milliseconds: 400),
@@ -80,7 +84,6 @@ class _MainContainerState extends State<MainContainer> {
   @override
   Widget build(BuildContext context) {
     bool shouldShowProfilePage = _bottomNavIndex == 2;
-
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
@@ -90,7 +93,6 @@ class _MainContainerState extends State<MainContainer> {
           PageView(
             controller: _pageController,
             scrollDirection: Axis.vertical,
-            // 这个 physics 是正确的，允许页面正常滚动
             physics: const ClampingScrollPhysics(),
             onPageChanged: (pageIndex) {
               setState(() {
