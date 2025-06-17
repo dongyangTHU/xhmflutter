@@ -1,6 +1,9 @@
+// lib/pages/home_page.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'membership_recharge_page.dart'; // KEY CHANGE: 引入新页面
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -74,14 +77,6 @@ class _HomePageState extends State<HomePage> {
         SafeArea(
           bottom: false,
           child: SingleChildScrollView(
-            // ===================================================================
-            // KEY FIX: 这里的 physics 属性已被移除（或注释掉）。
-            // 这是解决问题的核心。移除后，内部的滚动视图将不再与外部的PageView竞争手势，
-            // 从而允许用户在页面顶部向下滑动时，能够正确地触发返回IntroPage的操作。
-            // ===================================================================
-            // physics: const BouncingScrollPhysics(
-            //   parent: AlwaysScrollableScrollPhysics(),
-            // ),
             child: Column(
               children: [
                 Padding(
@@ -124,7 +119,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- 所有 _build* 方法保持不变 ---
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
@@ -144,30 +138,42 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
-            ),
-            child: Row(
-              children: const [
-                Icon(Icons.shield, color: Colors.yellow, size: 16),
-                SizedBox(width: 4),
-                Text(
-                  '1502937',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+          // KEY CHANGE: 将充值部分用 InkWell 包裹，使其可点击
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MembershipRechargePage(),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.shield, color: Colors.yellow, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    '1502937',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  '充值',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
+                  SizedBox(width: 8),
+                  Text(
+                    '充值',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -175,6 +181,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // --- 其他 _build* 方法保持不变 ---
   Widget _buildMenuButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
