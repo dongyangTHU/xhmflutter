@@ -1,0 +1,45 @@
+# Miscellaneous
+*.class
+*.lock
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+/ios/Flutter/.last_build_id
+/ios/Flutter/App.framework
+/ios/Flutter/Flutter.framework
+/ios/Flutter/engine_checksum.txt
+/ios/Flutter/flutter_assets/
+/ios/Pods/
+/ios/Runner.xcworkspace
+/ios/.symlinks/
+/ios/build/
+/ios/Pods.lock
+
+# Android
+/android/app/src/main/assets/flutter_assets/
+/android/app/build/
+/android/.gradle/
+/android/captures/
+/android/gradle/wrapper/gradle-wrapper.jar
+/android/local.properties
+/android/.idea/
+android/gradlew
+android/gradlew.bat
+
+# IntelliJ
+.idea/
+*.iml
