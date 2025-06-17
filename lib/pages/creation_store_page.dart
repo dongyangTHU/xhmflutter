@@ -1,6 +1,7 @@
 // lib/pages/creation_store_page.dart
 
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 class CreationStorePage extends StatefulWidget {
   const CreationStorePage({super.key});
@@ -9,24 +10,71 @@ class CreationStorePage extends StatefulWidget {
   State<CreationStorePage> createState() => _CreationStorePageState();
 }
 
-// 使用 TickerProviderStateMixin 来为 TabController 提供 Ticker
 class _CreationStorePageState extends State<CreationStorePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  late final PageController _bannerPageController;
+  int _bannerCurrentPage = 0;
+  Timer? _bannerTimer;
+
+  // 为两个Tab分别定义Banner图片列表
+  final List<String> _petBannerImagePaths = [
+    'assets/images/cat2.jpg',
+    'assets/images/cat5.jpg',
+    'assets/images/cat6.jpg',
+  ];
+  final List<String> _humanPetBannerImagePaths = [
+    'assets/images/cat1.jpg',
+    'assets/images/cat3.jpg',
+    'assets/images/cat4.jpg',
+  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _bannerPageController = PageController();
+    _startBannerTimer();
+
+    // 监听Tab切换，以便在需要时可以重置Banner状态或加载不同数据
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        _bannerPageController.jumpToPage(0); // 切换Tab时重置Banner到第一页
+        setState(() {
+          _bannerCurrentPage = 0;
+        });
+      }
+    });
+  }
+
+  void _startBannerTimer() {
+    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!_bannerPageController.hasClients) return;
+
+      // 根据当前激活的Tab来决定Banner的总页数
+      int pageCount = _tabController.index == 0
+          ? _petBannerImagePaths.length
+          : _humanPetBannerImagePaths.length;
+
+      if (pageCount == 0) return;
+
+      int nextPage = (_bannerCurrentPage + 1) % pageCount;
+      _bannerPageController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _bannerPageController.dispose();
+    _bannerTimer?.cancel();
     super.dispose();
   }
 
-  // 定义主题色
   static const Color _scaffoldBgColor = Color(0xFF1A182E);
 
   @override
@@ -40,11 +88,29 @@ class _CreationStorePageState extends State<CreationStorePage>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [
+              children: [
                 // 宠物写真 视图
-                PetPhotoView(),
+                PetPhotoView(
+                  bannerController: _bannerPageController,
+                  bannerImages: _petBannerImagePaths,
+                  currentPage: _bannerCurrentPage,
+                  onPageChanged: (page) {
+                    setState(() {
+                      _bannerCurrentPage = page;
+                    });
+                  },
+                ),
                 // 人宠合照 视图
-                HumanPetPhotoView(),
+                HumanPetPhotoView(
+                  bannerController: _bannerPageController,
+                  bannerImages: _humanPetBannerImagePaths,
+                  currentPage: _bannerCurrentPage,
+                  onPageChanged: (page) {
+                    setState(() {
+                      _bannerCurrentPage = page;
+                    });
+                  },
+                ),
               ],
             ),
           ),
@@ -110,17 +176,32 @@ class _CreationStorePageState extends State<CreationStorePage>
 
 // 宠物写真视图
 class PetPhotoView extends StatelessWidget {
-  const PetPhotoView({super.key});
+  final PageController bannerController;
+  final List<String> bannerImages;
+  final int currentPage;
+  final ValueChanged<int> onPageChanged;
+
+  const PetPhotoView({
+    super.key,
+    required this.bannerController,
+    required this.bannerImages,
+    required this.currentPage,
+    required this.onPageChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // 使用 SingleChildScrollView + Column 的正确布局方式
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.asset('assets/images/cat2.jpg'), // 示例图片
+          _buildAutoScrollBanner(
+            context,
+            bannerController,
+            bannerImages,
+            currentPage,
+            onPageChanged,
           ),
           const SizedBox(height: 24),
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: true),
@@ -134,7 +215,18 @@ class PetPhotoView extends StatelessWidget {
 
 // 人宠合照视图
 class HumanPetPhotoView extends StatelessWidget {
-  const HumanPetPhotoView({super.key});
+  final PageController bannerController;
+  final List<String> bannerImages;
+  final int currentPage;
+  final ValueChanged<int> onPageChanged;
+
+  const HumanPetPhotoView({
+    super.key,
+    required this.bannerController,
+    required this.bannerImages,
+    required this.currentPage,
+    required this.onPageChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +234,6 @@ class HumanPetPhotoView extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 创建个人AI形象按钮
           ElevatedButton.icon(
             icon: const Icon(Icons.add, color: Colors.white),
             label: const Text(
@@ -160,9 +251,17 @@ class HumanPetPhotoView extends StatelessWidget {
             onPressed: () {},
           ),
           const SizedBox(height: 24),
+          _buildAutoScrollBanner(
+            context,
+            bannerController,
+            bannerImages,
+            currentPage,
+            onPageChanged,
+          ),
+          const SizedBox(height: 24),
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: false),
           const SizedBox(height: 24),
-          _buildSection(context, '优惠', '超值限时特价套系', isPet: true), // 原型图这里还是宠物
+          _buildSection(context, '优惠', '超值限时特价套系', isPet: true),
         ],
       ),
     );
@@ -170,6 +269,55 @@ class HumanPetPhotoView extends StatelessWidget {
 }
 
 // --- 通用辅助方法 ---
+
+// 构建自动翻页Banner
+Widget _buildAutoScrollBanner(
+  BuildContext context,
+  PageController controller,
+  List<String> images,
+  int currentPage,
+  ValueChanged<int> onPageChanged,
+) {
+  if (images.isEmpty) return const SizedBox.shrink(); // 如果没有图片则不显示
+
+  return SizedBox(
+    height: 150,
+    child: Stack(
+      alignment: Alignment.bottomCenter,
+      children: [
+        PageView.builder(
+          controller: controller,
+          itemCount: images.length,
+          onPageChanged: onPageChanged,
+          itemBuilder: (context, index) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(16.0),
+              child: Image.asset(images[index], fit: BoxFit.cover),
+            );
+          },
+        ),
+        Positioned(
+          bottom: 10.0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(images.length, (index) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                height: 8.0,
+                width: currentPage == index ? 24.0 : 8.0,
+                decoration: BoxDecoration(
+                  color: currentPage == index ? Colors.white : Colors.white54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 // 构建内容分区
 Widget _buildSection(
@@ -207,10 +355,10 @@ Widget _buildSection(
       ),
       const SizedBox(height: 16),
       SizedBox(
-        height: 220, // 固定高度的横向滚动列表
+        height: 220,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          itemCount: 3, // 示例数量
+          itemCount: 3,
           itemBuilder: (context, index) {
             return _buildPhotoCard(isPet: isPet, index: index);
           },
@@ -222,7 +370,6 @@ Widget _buildSection(
 
 // 构建写真套系卡片
 Widget _buildPhotoCard({required bool isPet, required int index}) {
-  // 示例数据
   final petImages = [
     'assets/images/cat5.jpg',
     'assets/images/cat6.jpg',
@@ -246,7 +393,7 @@ Widget _buildPhotoCard({required bool isPet, required int index}) {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Image.asset(
-              images[index],
+              images[index % images.length],
               fit: BoxFit.cover,
               width: double.infinity,
             ),

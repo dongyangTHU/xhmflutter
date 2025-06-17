@@ -1,12 +1,13 @@
 // lib/pages/intro_page.dart
 
 import 'package:flutter/material.dart';
-import 'creation_store_page.dart'; // KEY CHANGE: 引入新页面
+import '../widgets/app_top_bar.dart'; // KEY CHANGE: 引入新的通用组件
+import 'creation_store_page.dart';
+import 'membership_recharge_page.dart';
 
 class IntroPage extends StatelessWidget {
   const IntroPage({super.key});
 
-  // 这个辅助 Widget 本身保持不变
   Widget _buildMenuButton(IconData icon, String label) {
     return Column(
       children: [
@@ -55,13 +56,14 @@ class IntroPage extends StatelessWidget {
         SafeArea(
           child: Column(
             children: [
+              // KEY CHANGE: 直接使用 AppTopBar 组件
+              const AppTopBar(),
               const Spacer(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    // KEY CHANGE: 将“开始创作”按钮用 GestureDetector 包裹以添加点击事件
                     GestureDetector(
                       onTap: () {
                         Navigator.push(

@@ -3,7 +3,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'creation_store_page.dart'; // KEY CHANGE: 引入新页面
+import '../widgets/app_top_bar.dart'; // KEY CHANGE: 引入新的通用组件
+import 'creation_store_page.dart';
 import 'membership_recharge_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -80,17 +81,18 @@ class _HomePageState extends State<HomePage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
                   child: Icon(
                     Icons.keyboard_arrow_down,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white70,
                     size: 24,
                   ),
                 ),
-                _buildTopBar(),
+                // KEY CHANGE: 直接使用 AppTopBar 组件
+                const AppTopBar(),
                 const SizedBox(height: 20),
-                _buildMenuButtons(), // This method is now updated
+                _buildMenuButtons(),
                 const SizedBox(height: 20),
                 _buildBanner(),
                 const SizedBox(height: 24),
@@ -120,13 +122,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // KEY CHANGE: _buildTopBar 方法已被移除，因为它的功能被 AppTopBar 组件替代了
+
+  // --- 其他 _build* 方法保持不变 ---
+
   Widget _buildMenuButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // KEY CHANGE: 将“开始创作”按钮用 GestureDetector 包裹以添加点击事件
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -146,9 +151,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- 其他 _build* 方法保持不变 ---
-
-  // _buildMenuButton 辅助方法本身保持不变
   Widget _buildMenuButton(IconData icon, String label) {
     return Column(
       children: [
@@ -166,67 +168,6 @@ class _HomePageState extends State<HomePage> {
           style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
       ],
-    );
-  }
-
-  Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: const [
-              CircleAvatar(
-                backgroundImage: AssetImage('assets/images/256.png'),
-                radius: 20,
-              ),
-              SizedBox(width: 8),
-              Text(
-                '点击会有惊喜',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-            ],
-          ),
-          InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MembershipRechargePage(),
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.shield, color: Colors.yellow, size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    '1502937',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    '充值',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
