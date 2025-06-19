@@ -2,10 +2,9 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:ui';
-import '../widgets/app_top_bar.dart'; // KEY CHANGE: 引入新的通用组件
-import 'creation_store_page.dart';
-import 'membership_recharge_page.dart';
+import '../widgets/app_top_bar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -36,20 +35,14 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _bannerPageController = PageController(initialPage: 0);
-    _bannerPageController.addListener(() {
-      if (_bannerPageController.page?.round() != _currentPage) {
-        setState(() {
-          _currentPage = _bannerPageController.page!.round();
-        });
-      }
-    });
     _startBannerTimer();
   }
 
   void _startBannerTimer() {
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_bannerPageController.hasClients) {
-        int nextPage = (_currentPage + 1) % _bannerImagePaths.length;
+        int nextPage = (_bannerPageController.page!.round() + 1) %
+            _bannerImagePaths.length;
         _bannerPageController.animateToPage(
           nextPage,
           duration: const Duration(milliseconds: 400),
@@ -79,20 +72,13 @@ class _HomePageState extends State<HomePage> {
         SafeArea(
           bottom: false,
           child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Icon(
-                    Icons.keyboard_arrow_down,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
-                ),
-                // KEY CHANGE: 直接使用 AppTopBar 组件
+                const SizedBox(height: 20),
                 const AppTopBar(),
                 const SizedBox(height: 20),
-                _buildMenuButtons(),
+                _buildMenuButtons(context),
                 const SizedBox(height: 20),
                 _buildBanner(),
                 const SizedBox(height: 24),
@@ -122,11 +108,44 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // KEY CHANGE: _buildTopBar 方法已被移除，因为它的功能被 AppTopBar 组件替代了
+  // --- 关键修改位置 ---
+  Widget _buildImageGrid() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: GridView.builder(
+        itemCount: _gridImagePaths.length,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 3 / 4,
+        ),
+        itemBuilder: (context, index) {
+          final imagePath = _gridImagePaths[index];
+          // 使用 GestureDetector 包裹图片以添加点击事件
+          return GestureDetector(
+            onTap: () {
+              // 点击后，使用 GoRouter 跳转到预览页，并通过 extra 传递图片路径
+              context.push('/photo-view', extra: imagePath);
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              // 使用 Hero 组件，并以图片路径作为 tag，以实现平滑的过渡动画
+              child: Hero(
+                tag: imagePath,
+                child: Image.asset(imagePath, fit: BoxFit.cover),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-  // --- 其他 _build* 方法保持不变 ---
-
-  Widget _buildMenuButtons() {
+  // 其他 _build* 方法无需修改
+  Widget _buildMenuButtons(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Row(
@@ -134,12 +153,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           GestureDetector(
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CreationStorePage(),
-                ),
-              );
+              context.push('/creation-store');
             },
             child: _buildMenuButton(Icons.add_circle, '开始创作'),
           ),
@@ -180,6 +194,11 @@ class _HomePageState extends State<HomePage> {
           PageView.builder(
             controller: _bannerPageController,
             itemCount: _bannerImagePaths.length,
+            onPageChanged: (page) {
+              setState(() {
+                _currentPage = page;
+              });
+            },
             itemBuilder: (context, index) {
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -204,29 +223,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildImageGrid() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: GridView.builder(
-        itemCount: _gridImagePaths.length,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 3 / 4,
-        ),
-        itemBuilder: (context, index) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(_gridImagePaths[index], fit: BoxFit.cover),
-          );
-        },
       ),
     );
   }

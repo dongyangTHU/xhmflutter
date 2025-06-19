@@ -2,33 +2,19 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'dart:ui';
-import 'membership_recharge_page.dart'; // KEY CHANGE: 引入新页面
+import '../viewmodels/profile_viewmodel.dart';
 
-class ProfilePage extends StatefulWidget {
+class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
-}
-
-class _ProfilePageState extends State<ProfilePage> {
-  File? _wallpaperImage;
-
-  Future<void> _pickWallpaper() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      setState(() {
-        _wallpaperImage = File(pickedFile.path);
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // 使用 context.watch 监听 ProfileViewModel 的变化
+    final profileViewModel = context.watch<ProfileViewModel>();
+
     return Container(
       color: const Color(0xff1c1b22),
       child: SingleChildScrollView(
@@ -37,9 +23,10 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         child: Column(
           children: [
-            _buildWallpaperArea(),
+            // 将 viewModel 和它的方法传递给构建方法
+            _buildWallpaperArea(context, profileViewModel),
             const SizedBox(height: 20),
-            _buildMembershipCard(), // This method is now updated
+            _buildMembershipCard(context), // 传入 context 以便导航
             const SizedBox(height: 30),
             _buildPetSection(),
             const SizedBox(height: 20),
@@ -53,16 +40,48 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildMembershipCard() {
-    // KEY CHANGE: 使用 GestureDetector 或 InkWell 使卡片可点击
+  Widget _buildWallpaperArea(BuildContext context, ProfileViewModel viewModel) {
+    return GestureDetector(
+      // 调用 ViewModel 中的方法
+      onTap: () => viewModel.pickWallpaper(),
+      child: SizedBox(
+        height: 280,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ClipRRect(
+              // 从 ViewModel 获取图片状态
+              child: viewModel.wallpaperImage == null
+                  ? Image.asset('assets/images/cat9.jpg', fit: BoxFit.cover)
+                  : Image.file(viewModel.wallpaperImage!, fit: BoxFit.cover),
+            ),
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.1),
+                      Colors.black.withOpacity(0.5),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            _buildHeaderContent(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMembershipCard(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const MembershipRechargePage(),
-          ),
-        );
+        // 使用 GoRouter 进行页面跳转
+        context.push('/membership-recharge');
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -125,43 +144,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // --- 其他所有方法保持不变 ---
-
-  Widget _buildWallpaperArea() {
-    return GestureDetector(
-      onTap: _pickWallpaper,
-      child: SizedBox(
-        height: 280,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            ClipRRect(
-              child: _wallpaperImage == null
-                  ? Image.asset('assets/images/cat9.jpg', fit: BoxFit.cover)
-                  : Image.file(_wallpaperImage!, fit: BoxFit.cover),
-            ),
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.1),
-                      Colors.black.withOpacity(0.5),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            _buildHeaderContent(),
-          ],
-        ),
-      ),
-    );
-  }
-
+  // --- 其他构建方法保持不变 ---
+  // 它们现在是 StatelessWidget 的一部分
   Widget _buildHeaderContent() {
     return SafeArea(
       bottom: false,

@@ -1,9 +1,8 @@
 // lib/pages/intro_page.dart
 
 import 'package:flutter/material.dart';
-import '../widgets/app_top_bar.dart'; // KEY CHANGE: 引入新的通用组件
-import 'creation_store_page.dart';
-import 'membership_recharge_page.dart';
+import 'package:go_router/go_router.dart';
+import '../widgets/app_top_bar.dart';
 
 class IntroPage extends StatelessWidget {
   const IntroPage({super.key});
@@ -35,6 +34,7 @@ class IntroPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // IntroPage 不再需要自己的 Scaffold，因为它将被 PageView 管理
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -56,7 +56,6 @@ class IntroPage extends StatelessWidget {
         SafeArea(
           child: Column(
             children: [
-              // KEY CHANGE: 直接使用 AppTopBar 组件
               const AppTopBar(),
               const Spacer(),
               Padding(
@@ -66,12 +65,7 @@ class IntroPage extends StatelessWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CreationStorePage(),
-                          ),
-                        );
+                        context.push('/creation-store');
                       },
                       child: _buildMenuButton(Icons.add_circle, '开始创作'),
                     ),
@@ -82,6 +76,7 @@ class IntroPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40),
+              // 恢复“上滑”提示
               Column(
                 children: const [
                   SizedBox(height: 8),
