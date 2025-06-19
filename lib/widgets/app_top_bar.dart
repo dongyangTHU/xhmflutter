@@ -1,7 +1,8 @@
 // lib/widgets/app_top_bar.dart
 
 import 'package:flutter/material.dart';
-import '../pages/membership_recharge_page.dart';
+import 'package:go_router/go_router.dart';
+// 不再需要 'package:intl/intl.dart'
 
 class AppTopBar extends StatelessWidget {
   const AppTopBar({super.key});
@@ -13,7 +14,7 @@ class AppTopBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 左侧：头像和文字
+          // 左侧部分恢复为简单的 Row 结构
           Row(
             children: const [
               CircleAvatar(
@@ -27,15 +28,10 @@ class AppTopBar extends StatelessWidget {
               ),
             ],
           ),
-          // 右侧：可点击的充值按钮
+          // 右侧部分保持不变
           InkWell(
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MembershipRechargePage(),
-                ),
-              );
+              context.push('/membership-recharge');
             },
             borderRadius: BorderRadius.circular(20),
             child: Container(

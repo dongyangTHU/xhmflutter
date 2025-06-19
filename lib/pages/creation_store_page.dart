@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+// 父组件现在变得更简单，只负责管理 TabController
 class CreationStorePage extends StatefulWidget {
   const CreationStorePage({super.key});
 
@@ -13,65 +14,16 @@ class CreationStorePage extends StatefulWidget {
 class _CreationStorePageState extends State<CreationStorePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  late final PageController _bannerPageController;
-  int _bannerCurrentPage = 0;
-  Timer? _bannerTimer;
-
-  // 为两个Tab分别定义Banner图片列表
-  final List<String> _petBannerImagePaths = [
-    'assets/images/cat2.jpg',
-    'assets/images/cat5.jpg',
-    'assets/images/cat6.jpg',
-  ];
-  final List<String> _humanPetBannerImagePaths = [
-    'assets/images/cat1.jpg',
-    'assets/images/cat3.jpg',
-    'assets/images/cat4.jpg',
-  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _bannerPageController = PageController();
-    _startBannerTimer();
-
-    // 监听Tab切换，以便在需要时可以重置Banner状态或加载不同数据
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        _bannerPageController.jumpToPage(0); // 切换Tab时重置Banner到第一页
-        setState(() {
-          _bannerCurrentPage = 0;
-        });
-      }
-    });
-  }
-
-  void _startBannerTimer() {
-    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!_bannerPageController.hasClients) return;
-
-      // 根据当前激活的Tab来决定Banner的总页数
-      int pageCount = _tabController.index == 0
-          ? _petBannerImagePaths.length
-          : _humanPetBannerImagePaths.length;
-
-      if (pageCount == 0) return;
-
-      int nextPage = (_bannerCurrentPage + 1) % pageCount;
-      _bannerPageController.animateToPage(
-        nextPage,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _bannerPageController.dispose();
-    _bannerTimer?.cancel();
     super.dispose();
   }
 
@@ -88,29 +40,10 @@ class _CreationStorePageState extends State<CreationStorePage>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
-                // 宠物写真 视图
-                PetPhotoView(
-                  bannerController: _bannerPageController,
-                  bannerImages: _petBannerImagePaths,
-                  currentPage: _bannerCurrentPage,
-                  onPageChanged: (page) {
-                    setState(() {
-                      _bannerCurrentPage = page;
-                    });
-                  },
-                ),
-                // 人宠合照 视图
-                HumanPetPhotoView(
-                  bannerController: _bannerPageController,
-                  bannerImages: _humanPetBannerImagePaths,
-                  currentPage: _bannerCurrentPage,
-                  onPageChanged: (page) {
-                    setState(() {
-                      _bannerCurrentPage = page;
-                    });
-                  },
-                ),
+              // 两个视图现在是独立的
+              children: const [
+                PetPhotoView(), // 宠物写真视图，现在自己管理状态
+                HumanPetPhotoView(), // 人宠合照视图
               ],
             ),
           ),
@@ -174,35 +107,66 @@ class _CreationStorePageState extends State<CreationStorePage>
   }
 }
 
-// 宠物写真视图
-class PetPhotoView extends StatelessWidget {
-  final PageController bannerController;
-  final List<String> bannerImages;
-  final int currentPage;
-  final ValueChanged<int> onPageChanged;
+// --- 宠物写真视图：重构为 StatefulWidget ---
+class PetPhotoView extends StatefulWidget {
+  const PetPhotoView({super.key});
 
-  const PetPhotoView({
-    super.key,
-    required this.bannerController,
-    required this.bannerImages,
-    required this.currentPage,
-    required this.onPageChanged,
-  });
+  @override
+  State<PetPhotoView> createState() => _PetPhotoViewState();
+}
+
+// 将所有 Banner 相关的状态和逻辑封装到 PetPhotoView 的 State 中
+class _PetPhotoViewState extends State<PetPhotoView> {
+  late final PageController _bannerPageController;
+  int _bannerCurrentPage = 0;
+  Timer? _bannerTimer;
+
+  final List<String> _bannerImages = [
+    'assets/images/cat2.jpg',
+    'assets/images/cat5.jpg',
+    'assets/images/cat6.jpg',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _bannerPageController = PageController();
+    // 只有当这个视图可见时，才启动计时器
+    _startBannerTimer();
+  }
+
+  void _startBannerTimer() {
+    // 确保组件已挂载
+    if (!mounted) return;
+
+    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!_bannerPageController.hasClients) return;
+      if (_bannerImages.isEmpty) return;
+
+      int nextPage = (_bannerCurrentPage + 1) % _bannerImages.length;
+      _bannerPageController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _bannerPageController.dispose();
+    _bannerTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // 使用 SingleChildScrollView + Column 的正确布局方式
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          _buildAutoScrollBanner(
-            context,
-            bannerController,
-            bannerImages,
-            currentPage,
-            onPageChanged,
-          ),
+          // 在这里构建 Banner
+          _buildAutoScrollBanner(),
           const SizedBox(height: 24),
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: true),
           const SizedBox(height: 24),
@@ -211,22 +175,60 @@ class PetPhotoView extends StatelessWidget {
       ),
     );
   }
+
+  // 构建自动翻页 Banner 的方法现在是 PetPhotoViewState 的一部分
+  Widget _buildAutoScrollBanner() {
+    if (_bannerImages.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 150,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          PageView.builder(
+            controller: _bannerPageController,
+            itemCount: _bannerImages.length,
+            onPageChanged: (page) {
+              setState(() {
+                _bannerCurrentPage = page;
+              });
+            },
+            itemBuilder: (context, index) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(16.0),
+                child: Image.asset(_bannerImages[index], fit: BoxFit.cover),
+              );
+            },
+          ),
+          Positioned(
+            bottom: 10.0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_bannerImages.length, (index) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                  height: 8.0,
+                  width: _bannerCurrentPage == index ? 24.0 : 8.0,
+                  decoration: BoxDecoration(
+                    color: _bannerCurrentPage == index
+                        ? Colors.white
+                        : Colors.white54,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// 人宠合照视图
+// --- 人宠合照视图：保持为 StatelessWidget，且不再显示 Banner ---
 class HumanPetPhotoView extends StatelessWidget {
-  final PageController bannerController;
-  final List<String> bannerImages;
-  final int currentPage;
-  final ValueChanged<int> onPageChanged;
-
-  const HumanPetPhotoView({
-    super.key,
-    required this.bannerController,
-    required this.bannerImages,
-    required this.currentPage,
-    required this.onPageChanged,
-  });
+  const HumanPetPhotoView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -251,14 +253,7 @@ class HumanPetPhotoView extends StatelessWidget {
             onPressed: () {},
           ),
           const SizedBox(height: 24),
-          _buildAutoScrollBanner(
-            context,
-            bannerController,
-            bannerImages,
-            currentPage,
-            onPageChanged,
-          ),
-          const SizedBox(height: 24),
+          // Banner 已被移除
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: false),
           const SizedBox(height: 24),
           _buildSection(context, '优惠', '超值限时特价套系', isPet: true),
@@ -268,57 +263,7 @@ class HumanPetPhotoView extends StatelessWidget {
   }
 }
 
-// --- 通用辅助方法 ---
-
-// 构建自动翻页Banner
-Widget _buildAutoScrollBanner(
-  BuildContext context,
-  PageController controller,
-  List<String> images,
-  int currentPage,
-  ValueChanged<int> onPageChanged,
-) {
-  if (images.isEmpty) return const SizedBox.shrink(); // 如果没有图片则不显示
-
-  return SizedBox(
-    height: 150,
-    child: Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        PageView.builder(
-          controller: controller,
-          itemCount: images.length,
-          onPageChanged: onPageChanged,
-          itemBuilder: (context, index) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(16.0),
-              child: Image.asset(images[index], fit: BoxFit.cover),
-            );
-          },
-        ),
-        Positioned(
-          bottom: 10.0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(images.length, (index) {
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                height: 8.0,
-                width: currentPage == index ? 24.0 : 8.0,
-                decoration: BoxDecoration(
-                  color: currentPage == index ? Colors.white : Colors.white54,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
+// --- 以下是两个视图共用的辅助方法，保持为全局函数 ---
 // 构建内容分区
 Widget _buildSection(
   BuildContext context,
@@ -350,7 +295,8 @@ Widget _buildSection(
               ),
             ],
           ),
-          Text('更多套系 >', style: TextStyle(color: Colors.white70, fontSize: 14)),
+          const Text('更多套系 >',
+              style: TextStyle(color: Colors.white70, fontSize: 14)),
         ],
       ),
       const SizedBox(height: 16),
