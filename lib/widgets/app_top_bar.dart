@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-// 不再需要 'package:intl/intl.dart'
+import 'package:intl/intl.dart';
 
 class AppTopBar extends StatelessWidget {
   const AppTopBar({super.key});
@@ -14,7 +14,6 @@ class AppTopBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 左侧部分恢复为简单的 Row 结构
           Row(
             children: const [
               CircleAvatar(
@@ -28,7 +27,6 @@ class AppTopBar extends StatelessWidget {
               ),
             ],
           ),
-          // 右侧部分保持不变
           InkWell(
             onTap: () {
               context.push('/membership-recharge');
@@ -43,7 +41,8 @@ class AppTopBar extends StatelessWidget {
               ),
               child: Row(
                 children: const [
-                  Icon(Icons.shield, color: Colors.yellow, size: 16),
+                  // --- 关键修改：替换图标 ---
+                  Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
                   SizedBox(width: 4),
                   Text(
                     '1502937',

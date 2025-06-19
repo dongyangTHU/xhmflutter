@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:go_router/go_router.dart';
 
 // 父组件现在变得更简单，只负责管理 TabController
 class CreationStorePage extends StatefulWidget {
@@ -58,7 +59,8 @@ class _CreationStorePageState extends State<CreationStorePage>
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
-        onPressed: () => Navigator.of(context).pop(),
+        // 使用 GoRouter 的 pop 方法返回
+        onPressed: () => context.pop(),
       ),
       title: const Text(
         '写真商店',
@@ -75,7 +77,7 @@ class _CreationStorePageState extends State<CreationStorePage>
           ),
           child: Row(
             children: const [
-              Icon(Icons.shield, color: Colors.yellow, size: 16),
+              Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
               SizedBox(width: 4),
               Text(
                 '1502937',
@@ -140,9 +142,7 @@ class _PetPhotoViewState extends State<PetPhotoView> {
     if (!mounted) return;
 
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!_bannerPageController.hasClients) return;
-      if (_bannerImages.isEmpty) return;
-
+      if (!_bannerPageController.hasClients || _bannerImages.isEmpty) return;
       int nextPage = (_bannerCurrentPage + 1) % _bannerImages.length;
       _bannerPageController.animateToPage(
         nextPage,
@@ -306,7 +306,8 @@ Widget _buildSection(
           scrollDirection: Axis.horizontal,
           itemCount: 3,
           itemBuilder: (context, index) {
-            return _buildPhotoCard(isPet: isPet, index: index);
+            return _buildPhotoCard(
+                context: context, isPet: isPet, index: index);
           },
         ),
       ),
@@ -315,7 +316,8 @@ Widget _buildSection(
 }
 
 // 构建写真套系卡片
-Widget _buildPhotoCard({required bool isPet, required int index}) {
+Widget _buildPhotoCard(
+    {required BuildContext context, required bool isPet, required int index}) {
   final petImages = [
     'assets/images/cat5.jpg',
     'assets/images/cat6.jpg',
@@ -329,58 +331,64 @@ Widget _buildPhotoCard({required bool isPet, required int index}) {
   final images = isPet ? petImages : humanPetImages;
   final price = isPet ? '299' : '599';
 
-  return Container(
-    width: 160,
-    margin: const EdgeInsets.only(right: 12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.asset(
-              images[index % images.length],
-              fit: BoxFit.cover,
-              width: double.infinity,
+  return GestureDetector(
+    onTap: () {
+      context.push('/package-detail');
+    },
+    child: Container(
+      width: 160,
+      margin: const EdgeInsets.only(right: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                images[index % images.length],
+                fit: BoxFit.cover,
+                width: double.infinity,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  '套系名称',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    '套系名称',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  '节日盛典 | 8.8万用户使用',
-                  style: TextStyle(color: Colors.white70, fontSize: 10),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                const Icon(Icons.flash_on, color: Colors.yellow, size: 16),
-                Text(
-                  price,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                  SizedBox(height: 2),
+                  Text(
+                    '节日盛典 | 8.8万用户使用',
+                    style: TextStyle(color: Colors.white70, fontSize: 10),
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
+                  const SizedBox(width: 2),
+                  Text(
+                    price,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
     ),
   );
 }

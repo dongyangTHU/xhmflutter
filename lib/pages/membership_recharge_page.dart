@@ -10,9 +10,8 @@ class MembershipRechargePage extends StatefulWidget {
 }
 
 class _MembershipRechargePageState extends State<MembershipRechargePage> {
-  int _selectedPlanIndex = 1; // 默认选中第二个套餐
+  int _selectedPlanIndex = 1;
 
-  // 定义主题色
   static const Color _primaryColor = Color(0xFF7A5CFA);
   static const Color _scaffoldBgColor = Color(0xFF1A182E);
 
@@ -37,7 +36,7 @@ class _MembershipRechargePageState extends State<MembershipRechargePage> {
               _buildMembershipPrivilegesSection(),
               const SizedBox(height: 30),
               _buildPricingSection(),
-              const SizedBox(height: 120), // 为底部支付栏留出空间
+              const SizedBox(height: 120),
             ],
           ),
         ),
@@ -163,7 +162,8 @@ class _MembershipRechargePageState extends State<MembershipRechargePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (!isCustom)
-                const Icon(Icons.flash_on, color: Colors.yellow, size: 16),
+                // --- 关键修改：替换图标 ---
+                const Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
               const SizedBox(width: 4),
               Text(
                 amount,
@@ -233,10 +233,11 @@ class _MembershipRechargePageState extends State<MembershipRechargePage> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        Text(
-          '$actionText >',
-          style: const TextStyle(color: Colors.white70, fontSize: 14),
-        ),
+        if (actionText.isNotEmpty)
+          Text(
+            '$actionText >',
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
       ],
     );
   }

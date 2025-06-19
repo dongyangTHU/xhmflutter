@@ -9,6 +9,7 @@ import '../pages/profile_page.dart';
 import '../widgets/main_scaffold.dart';
 // --- 导入新页面 ---
 import '../pages/photo_view_page.dart';
+import '../pages/package_detail_page.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorKey =
@@ -55,6 +56,13 @@ final appRouter = GoRouter(
         // 从 extra 参数中安全地获取图片路径
         final String imagePath = state.extra as String;
         return PhotoViewPage(imagePath: imagePath);
+      },
+    ),
+    GoRoute(
+      path: '/package-detail',
+      builder: (context, state) {
+        // 后续可以从 state.extra 中接收套系数据
+        return const PackageDetailPage();
       },
     ),
   ],
