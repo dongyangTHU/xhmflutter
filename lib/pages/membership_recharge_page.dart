@@ -35,7 +35,57 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
     ['assets/images/cat9.jpg'],
   ];
   final List<String> _privilegeLabels = ['数字形象', '优先生成', '写真底图', '每日冻干'];
-  int _selectedPlanIndex = 1;
+
+  // --- 主要改动 1: 数据模型化 ---
+  // 将套餐数据结构化，便于管理和渲染
+  int _selectedPlanIndex = 1; // 默认选中月卡
+  final List<Map<String, dynamic>> _plans = [
+    {
+      'title': '连续周卡',
+      'price': '¥19.9',
+      'originalPrice': '¥79.9',
+      'paymentText': '¥19.9/周',
+      'discount': '限时立减 ¥60',
+      'benefits': [
+        '连续周卡-连续周卡',
+        '连续周卡-连续周卡',
+        '连续周卡-连续周卡',
+        '连续周卡-连续周卡',
+        '连续周卡-连续周卡',
+        '连续周卡-连续周卡',
+      ]
+    },
+    {
+      'title': '连续月卡',
+      'price': '¥39.9',
+      'originalPrice': '¥179.9',
+      'paymentText': '¥39.9/月',
+      'discount': '限时立减 ¥140',
+      'benefits': [
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+      ]
+    },
+    {
+      'title': '连续季卡',
+      'price': '¥99.9',
+      'originalPrice': '¥239.9',
+      'paymentText': '¥99.9/季',
+      'discount': '限时立减 ¥140',
+      'benefits': [
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+        '·连续周卡-连续周卡',
+      ]
+    },
+  ];
 
   @override
   void initState() {
@@ -100,6 +150,7 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
       appBar: _buildAppBar(context),
       body: TabBarView(
         controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(), // 禁止左右滑动切换 Tab
         children: [
           _buildMembershipTab(context),
           _buildFreezeDriedTab(context),
@@ -143,36 +194,35 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
 
   // --- “会员”页面的构建方法 ---
   Widget _buildMembershipTab(BuildContext context) {
+    // --- 主要改动 2: 动态更新支付栏 ---
+    // 根据当前选中的套餐，获取支付栏需要显示的价格
+    final selectedPlanPaymentText = _plans[_selectedPlanIndex]['paymentText'];
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          // 1. 顶部 Banner 和选择条区域（固定高度，不滚动）
           _buildBannerAndSelectorStack(),
-          // 2. 下方的可滚动内容区域
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: _buildPricingSection(),
-              ),
+              padding: const EdgeInsets.only(top: 16, bottom: 24),
+              child: _buildPricingSection(),
             ),
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomPayBar('¥39.9/月', '含xx元优惠(会员价)'),
+      bottomNavigationBar: _buildBottomPayBar(
+        selectedPlanPaymentText, // 使用动态价格
+        '支付即同意《会员协议》', // 更新副标题
+      ),
     );
   }
 
-  // 将 Banner 和选择条包裹在 Stack 中以实现叠加
   Widget _buildBannerAndSelectorStack() {
-    // 使用 Key 来确保在模块切换时 PageView 被正确地重建
     final pageViewKey = ValueKey<int>(_selectedPrivilegeIndex);
-
     return Stack(
+      alignment: Alignment.bottomCenter,
       children: [
-        // 背景图片 Banner
         SizedBox(
           width: double.infinity,
           height: 250,
@@ -186,14 +236,15 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
               });
             },
             itemBuilder: (context, index) {
+              final images = _moduleBannerImages[_selectedPrivilegeIndex];
+              if (images.isEmpty) return Container(color: Colors.grey);
               return Image.asset(
-                _moduleBannerImages[_selectedPrivilegeIndex][index],
+                images[index % images.length],
                 fit: BoxFit.cover,
               );
             },
           ),
         ),
-        // 定位在底部的磨砂玻璃选择条
         Positioned(
           bottom: 0,
           left: 0,
@@ -241,8 +292,8 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: isSelected ? _primaryColor : Colors.transparent,
-              width: 3.0,
+              color: isSelected ? Colors.white : Colors.transparent,
+              width: 2.0,
             ),
           ),
         ),
@@ -251,85 +302,141 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.white70,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 14,
+            fontSize: 16,
           ),
         ),
       ),
     );
   }
 
+  // --- 主要改动 3: 重构价格版块 ---
   Widget _buildPricingSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text('精选会员',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
-            Text('兑换会员 >',
-                style: TextStyle(color: Colors.white70, fontSize: 14)),
-          ],
-        ),
-        const SizedBox(height: 4),
-        const Text('限时立减 ¥60',
-            style: TextStyle(color: Colors.white70, fontSize: 14)),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            _buildPricingCard('连续包周', '¥19.9', 0),
-            const SizedBox(width: 12),
-            _buildPricingCard('连续包月', '¥39.9', 1),
-            const SizedBox(width: 12),
-            _buildPricingCard('年费', '¥99.9', 2),
-          ],
-        ),
-      ],
+    final selectedPlanDiscount = _plans[_selectedPlanIndex]['discount'];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text('精选会员',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xffE4B07A),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(selectedPlanDiscount,
+                    style: const TextStyle(
+                        color: Color(0xff522E17),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text('兑换会员 >',
+              style: TextStyle(color: Colors.white70, fontSize: 14)),
+          const SizedBox(height: 16),
+          // 使用 IntrinsicHeight 确保 Row 内的卡片高度一致
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: List.generate(_plans.length, (index) {
+                bool isSelected = _selectedPlanIndex == index;
+                // 使用 Expanded 和 flex 实现动态宽度
+                return Expanded(
+                  flex: isSelected ? 4 : 3, // 选中时 flex 更大
+                  child: _buildPricingCard(
+                    plan: _plans[index],
+                    isSelected: isSelected,
+                    onTap: () => setState(() => _selectedPlanIndex = index),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildPricingCard(String title, String price, int index) {
-    bool isSelected = _selectedPlanIndex == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedPlanIndex = index),
-        child: Container(
-          padding: const EdgeInsets.all(12.0),
-          height: 180,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: isSelected ? _primaryColor : Colors.transparent,
-                width: 2),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF3A307B).withOpacity(0.5),
-                const Color(0xFF2B2361).withOpacity(0.5),
-              ],
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
+  // --- 主要改动 4: 重构价格卡片 ---
+  Widget _buildPricingCard({
+    required Map<String, dynamic> plan,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    // 根据选中状态定义不同的背景渐变
+    final gradient = isSelected
+        ? const LinearGradient(
+            colors: [Color(0xff434574), Color(0xff2e3054)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          )
+        : const LinearGradient(
+            colors: [Color(0x0027294D), Color(0x0027294D)],
+          );
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.all(12.0),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: isSelected
+                  ? const Color(0xff4d5082)
+                  : Colors.white.withOpacity(0.1),
+              width: 1),
+          gradient: gradient,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(plan['title'],
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14)),
+            const SizedBox(height: 8),
+            Text(plan['price'],
+                style: const TextStyle(
+                    color: Color(0xffE4B07A),
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold)),
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              Text(plan['originalPrice'],
                   style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(price,
-                  style: const TextStyle(
-                      color: _primaryColor,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold)),
-              const Spacer(),
-              _buildBenefitPoint('专属数字形象'),
-              _buildBenefitPoint('作品优先生成'),
+                      color: Colors.white54,
+                      fontSize: 12,
+                      decoration: TextDecoration.lineThrough)),
             ],
-          ),
+            const Spacer(),
+            // 使用 AnimatedOpacity 实现权益列表的淡入淡出
+            AnimatedOpacity(
+              opacity: isSelected ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 400),
+              child: isSelected
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: (plan['benefits'] as List<String>)
+                          .map((benefit) => _buildBenefitPoint(benefit))
+                          .toList(),
+                    )
+                  : const SizedBox.shrink(), // 未选中时，不占空间
+            ),
+          ],
         ),
       ),
     );
@@ -340,11 +447,13 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, color: _primaryColor, size: 14),
+          const Icon(Icons.circle, color: Color(0xffE4B07A), size: 5),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ),
@@ -353,12 +462,11 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
     );
   }
 
-  // --- “冻干”标签页的构建方法 ---
+  // --- “冻干”标签页的构建方法 (无改动) ---
   Widget _buildFreezeDriedTab(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
-        // 为 AppBar 和状态栏预留空间
         padding: EdgeInsets.only(
             top: kToolbarHeight + MediaQuery.of(context).padding.top,
             left: 16,
@@ -478,12 +586,13 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
     );
   }
 
+  // --- 底部支付栏 (无改动) ---
   Widget _buildBottomPayBar(String price, String subtitle) {
     return Container(
       height: 90,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 12),
       decoration: BoxDecoration(
-        color: _scaffoldBgColor.withOpacity(0.9),
+        color: _scaffoldBgColor,
         border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
       ),
       child: Row(
@@ -498,6 +607,7 @@ class _MembershipRechargePageState extends State<MembershipRechargePage>
                       color: Colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
               Text(subtitle,
                   style: const TextStyle(color: Colors.white70, fontSize: 12)),
             ],
