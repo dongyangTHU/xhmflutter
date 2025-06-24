@@ -3,8 +3,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart'; // 1. 导入 Provider
+import '../viewmodels/user_viewmodel.dart'; // 2. 导入 UserViewModel
 
-// 父组件现在变得更简单，只负责管理 TabController
 class CreationStorePage extends StatefulWidget {
   const CreationStorePage({super.key});
 
@@ -41,10 +42,9 @@ class _CreationStorePageState extends State<CreationStorePage>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              // 两个视图现在是独立的
               children: const [
-                PetPhotoView(), // 宠物写真视图，现在自己管理状态
-                HumanPetPhotoView(), // 人宠合照视图
+                PetPhotoView(),
+                HumanPetPhotoView(),
               ],
             ),
           ),
@@ -59,7 +59,6 @@ class _CreationStorePageState extends State<CreationStorePage>
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
-        // 使用 GoRouter 的 pop 方法返回
         onPressed: () => context.pop(),
       ),
       title: const Text(
@@ -68,25 +67,34 @@ class _CreationStorePageState extends State<CreationStorePage>
       ),
       centerTitle: true,
       actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
-              SizedBox(width: 4),
-              Text(
-                '1502937',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+        // --- 核心修改: 监听 UserViewModel 来动态显示余额 ---
+        Padding(
+          padding: const EdgeInsets.only(right: 16.0),
+          child: Consumer<UserViewModel>(
+            builder: (context, userViewModel, child) {
+              final balance = userViewModel.userInfo?.balance ?? '...';
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ),
-            ],
+                child: Row(
+                  children: [
+                    const Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      balance, // 3. 使用动态余额
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -109,7 +117,8 @@ class _CreationStorePageState extends State<CreationStorePage>
   }
 }
 
-// --- 宠物写真视图：重构为 StatefulWidget ---
+// ... PetPhotoView 和 HumanPetPhotoView 等其他代码保持不变 ...
+
 class PetPhotoView extends StatefulWidget {
   const PetPhotoView({super.key});
 
@@ -117,7 +126,6 @@ class PetPhotoView extends StatefulWidget {
   State<PetPhotoView> createState() => _PetPhotoViewState();
 }
 
-// 将所有 Banner 相关的状态和逻辑封装到 PetPhotoView 的 State 中
 class _PetPhotoViewState extends State<PetPhotoView> {
   late final PageController _bannerPageController;
   int _bannerCurrentPage = 0;
@@ -133,14 +141,11 @@ class _PetPhotoViewState extends State<PetPhotoView> {
   void initState() {
     super.initState();
     _bannerPageController = PageController();
-    // 只有当这个视图可见时，才启动计时器
     _startBannerTimer();
   }
 
   void _startBannerTimer() {
-    // 确保组件已挂载
     if (!mounted) return;
-
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!_bannerPageController.hasClients || _bannerImages.isEmpty) return;
       int nextPage = (_bannerCurrentPage + 1) % _bannerImages.length;
@@ -165,7 +170,6 @@ class _PetPhotoViewState extends State<PetPhotoView> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 在这里构建 Banner
           _buildAutoScrollBanner(),
           const SizedBox(height: 24),
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: true),
@@ -176,7 +180,6 @@ class _PetPhotoViewState extends State<PetPhotoView> {
     );
   }
 
-  // 构建自动翻页 Banner 的方法现在是 PetPhotoViewState 的一部分
   Widget _buildAutoScrollBanner() {
     if (_bannerImages.isEmpty) return const SizedBox.shrink();
 
@@ -226,7 +229,6 @@ class _PetPhotoViewState extends State<PetPhotoView> {
   }
 }
 
-// --- 人宠合照视图：保持为 StatelessWidget，且不再显示 Banner ---
 class HumanPetPhotoView extends StatelessWidget {
   const HumanPetPhotoView({super.key});
 
@@ -253,7 +255,6 @@ class HumanPetPhotoView extends StatelessWidget {
             onPressed: () {},
           ),
           const SizedBox(height: 24),
-          // Banner 已被移除
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: false),
           const SizedBox(height: 24),
           _buildSection(context, '优惠', '超值限时特价套系', isPet: true),
@@ -263,8 +264,6 @@ class HumanPetPhotoView extends StatelessWidget {
   }
 }
 
-// --- 以下是两个视图共用的辅助方法，保持为全局函数 ---
-// 构建内容分区
 Widget _buildSection(
   BuildContext context,
   String title,
@@ -315,7 +314,6 @@ Widget _buildSection(
   );
 }
 
-// 构建写真套系卡片
 Widget _buildPhotoCard(
     {required BuildContext context, required bool isPet, required int index}) {
   final petImages = [

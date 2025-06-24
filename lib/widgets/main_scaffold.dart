@@ -12,23 +12,23 @@ class MainScaffold extends StatelessWidget {
 
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith('/home')) {
+    // --- 关键修改: 监听 /intro 路径 ---
+    if (location.startsWith('/intro')) {
       return 0;
     }
     if (location.startsWith('/profile')) {
       return 2;
     }
+    // 默认返回首页索引
     return 0;
   }
 
   void _onItemTapped(int index, BuildContext context) {
     switch (index) {
       case 0:
-        // --- 关键修改 ---
-        // 在导航的同时，调用 ViewModel 的方法来重置 PageView
-        // 使用 context.read 只获取 ViewModel 实例并调用方法，不进行监听
+        // --- 关键修改: 跳转到 /intro ---
         context.read<HomeFlowViewModel>().resetToIntro();
-        context.go('/home');
+        context.go('/intro');
         break;
       case 1:
         context.push('/creation-store');

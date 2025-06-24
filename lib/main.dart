@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'router/app_router.dart';
 import 'viewmodels/profile_viewmodel.dart';
-// 导入新的 ViewModel
 import 'viewmodels/home_flow_viewmodel.dart';
+import 'viewmodels/user_viewmodel.dart';
+import 'viewmodels/auth_viewmodel.dart'; // 1. 导入 AuthViewModel
 
 void main() {
   runApp(const MyApp());
@@ -16,22 +17,28 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 2. 将 AuthViewModel 放在 UserViewModel 上方，以便 UserViewModel 可以访问它
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthViewModel()),
+        ChangeNotifierProvider(create: (_) => UserViewModel()),
         ChangeNotifierProvider(create: (_) => ProfileViewModel()),
-        // --- 关键修改 ---
-        // 将 HomeFlowViewModel 添加到 Provider 树中
         ChangeNotifierProvider(create: (_) => HomeFlowViewModel()),
       ],
-      child: MaterialApp.router(
-        routerConfig: appRouter,
-        debugShowCheckedModeBanner: false,
-        title: 'Pet App',
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          primarySwatch: Colors.blue,
-          scaffoldBackgroundColor: const Color(0xff1c1b22),
-        ),
+      // 3. 使用 Consumer 来确保 router 可以访问 AuthViewModel
+      child: Consumer<AuthViewModel>(
+        builder: (context, authViewModel, _) {
+          return MaterialApp.router(
+            routerConfig: createAppRouter(context), // 4. 创建并传入 router
+            debugShowCheckedModeBanner: false,
+            title: 'Pet App',
+            theme: ThemeData(
+              brightness: Brightness.dark,
+              primarySwatch: Colors.blue,
+              scaffoldBackgroundColor: const Color(0xff1c1b22),
+            ),
+          );
+        },
       ),
     );
   }
