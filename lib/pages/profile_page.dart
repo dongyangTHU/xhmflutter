@@ -18,6 +18,7 @@ class ProfilePage extends StatelessWidget {
       builder: (context, userViewModel, authViewModel, child) {
         return Container(
           color: const Color(0xff1c1b22),
+          // 注意：现在登出按钮只需要authViewModel
           child: _buildBody(context, userViewModel, authViewModel),
         );
       },
@@ -26,10 +27,12 @@ class ProfilePage extends StatelessWidget {
 
   Widget _buildBody(BuildContext context, UserViewModel userViewModel,
       AuthViewModel authViewModel) {
+    // 页面首次加载时，显示加载动画
     if (userViewModel.isLoading && userViewModel.userInfo == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // 加载失败时，显示重试按钮
     if (userViewModel.error != null && userViewModel.userInfo == null) {
       return Center(
         child: Column(
@@ -47,6 +50,7 @@ class ProfilePage extends StatelessWidget {
       );
     }
 
+    // 如果userInfo为空，提供一个默认的空对象，防止UI报错
     final userInfo = userViewModel.userInfo ?? UserEntity();
 
     return RefreshIndicator(
@@ -63,14 +67,42 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 20),
             _buildOptionList(),
             const SizedBox(height: 30),
-            // --- 核心修改: 将 authViewModel 传递给登出按钮 ---
-            _buildLogoutButton(context, authViewModel, userViewModel),
+            // 将 authViewModel 传递给登出按钮
+            _buildLogoutButton(context, authViewModel),
             const SizedBox(height: 100),
           ],
         ),
       ),
     );
   }
+
+  // --- 核心修改: _buildLogoutButton不再需要接收UserViewModel ---
+  Widget _buildLogoutButton(BuildContext context, AuthViewModel authViewModel) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white.withOpacity(0.15),
+          minimumSize: const Size(double.infinity, 50),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onPressed: () {
+          // --- 核心修改: 调用新的logout方法，不再需要传入任何参数 ---
+          authViewModel.logout();
+        },
+        child: const Text('退出',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  // ===================================================================
+  // 以下是UI代码，无需修改
+  // ===================================================================
 
   Widget _buildWallpaperArea(BuildContext context, UserEntity userInfo) {
     return SizedBox(
@@ -298,31 +330,6 @@ class ProfilePage extends StatelessWidget {
             child: Divider(color: Colors.white.withOpacity(0.1), height: 1),
           ),
       ],
-    );
-  }
-
-  // --- 核心修改: 实现登出按钮的 onPressed 逻辑 ---
-  Widget _buildLogoutButton(BuildContext context, AuthViewModel authViewModel,
-      UserViewModel userViewModel) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.15),
-          minimumSize: const Size(double.infinity, 50),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        onPressed: () {
-          // 调用 AuthViewModel 的登出方法
-          authViewModel.logout(userViewModel);
-        },
-        child: const Text('退出',
-            style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold)),
-      ),
     );
   }
 }

@@ -11,22 +11,9 @@ import '../widgets/main_scaffold.dart';
 import '../pages/photo_view_page.dart';
 import '../pages/package_detail_page.dart';
 import '../pages/login_page.dart';
+import '../pages/splash_page.dart';
 import '../viewmodels/auth_viewmodel.dart';
 
-// 启动页
-class SplashPage extends StatelessWidget {
-  const SplashPage({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF1A182E),
-      body: Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
-// 定义全局 GoRouter
 GoRouter createAppRouter(BuildContext context) {
   final authViewModel = context.read<AuthViewModel>();
 
@@ -34,36 +21,34 @@ GoRouter createAppRouter(BuildContext context) {
     navigatorKey: GlobalKey<NavigatorState>(),
     initialLocation: '/splash',
     refreshListenable: authViewModel,
-    // --- 核心修改: 采用更严谨的重定向逻辑 ---
+    // redirect逻辑成为唯一的导航决策者
     redirect: (BuildContext context, GoRouterState state) {
       final authStatus = authViewModel.authStatus;
-      final isLoggedIn = authStatus == AuthStatus.authenticated;
+      final location = state.uri.toString();
 
-      // 1. 当认证状态未知时，始终显示启动页
+      // 1. 如果还在初始化中，且当前不在启动页，则强制导航到启动页
       if (authStatus == AuthStatus.initializing) {
-        return '/splash';
+        return location == '/splash' ? null : '/splash';
       }
 
-      // 2. 定义公共页面 (这里现在只有一个登录页)
-      const loginRoute = '/login';
-      final isGoingToLogin = state.uri.toString() == loginRoute;
+      final isLoggedIn = authStatus == AuthStatus.authenticated;
 
-      // 场景 A: 用户已登录
+      // 2. 如果用户已登录
       if (isLoggedIn) {
-        // 如果用户已登录，但当前在登录页或启动页，则重定向到主页
-        if (isGoingToLogin || state.uri.toString() == '/splash') {
+        // 如果用户已登录，但当前页面是启动页或登录页，则强制导航到主页
+        if (location == '/splash' || location == '/login') {
           return '/intro';
         }
       }
-      // 场景 B: 用户未登录
+      // 3. 如果用户未登录
       else {
-        // 如果用户未登录，并且他们当前访问的不是登录页，则强制他们去登录
-        if (!isGoingToLogin) {
-          return loginRoute;
+        // 如果用户未登录，但当前不在登录页，则强制导航到登录页
+        if (location != '/login') {
+          return '/login';
         }
       }
 
-      // 3. 在所有其他情况下 (例如，未登录用户访问登录页)，不进行重定向
+      // 4. 其他所有情况（如已登录访问主页，未登录访问登录页），不进行任何操作
       return null;
     },
     routes: [
@@ -71,8 +56,6 @@ GoRouter createAppRouter(BuildContext context) {
         path: '/splash',
         builder: (context, state) => const SplashPage(),
       ),
-      // --- 核心修改: 路由简化 ---
-      // 现在只有一个 /login 路由，直接指向手机验证码登录页
       GoRoute(
         path: '/login',
         builder: (context, state) => const PhoneLoginPage(),

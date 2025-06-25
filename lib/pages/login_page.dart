@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import '../viewmodels/auth_viewmodel.dart';
-import '../viewmodels/user_viewmodel.dart';
+
+// 不再需要导入UserViewModel
+// import '../viewmodels/user_viewmodel.dart';
 
 class PhoneLoginPage extends StatefulWidget {
   const PhoneLoginPage({Key? key}) : super(key: key);
@@ -200,10 +202,10 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                                           content: Text("手机号或验证码不能为空")));
                                   return;
                                 }
+                                // --- 核心修改: 调用新的loginWithSms，不再需要传入UserViewModel ---
                                 context.read<AuthViewModel>().loginWithSms(
                                       _phoneController.text,
                                       _codeController.text,
-                                      context.read<UserViewModel>(),
                                     );
                               },
                         style: ElevatedButton.styleFrom(
@@ -222,9 +224,6 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                                     fontSize: 16, color: Colors.white)),
                       ),
                     ),
-
-                    // --- 新增: 测试跳转按钮 ---
-                    // 只在调试模式下显示
                     if (kDebugMode) ...[
                       const SizedBox(height: 16),
                       SizedBox(
@@ -234,8 +233,8 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                           onPressed: authViewModel.isLoading
                               ? null
                               : () {
-                                  context.read<AuthViewModel>().loginForTest(
-                                      context.read<UserViewModel>());
+                                  // --- 核心修改: 调用新的loginForTest，不再需要传入UserViewModel ---
+                                  context.read<AuthViewModel>().loginForTest();
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey.shade700,
@@ -248,7 +247,6 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                         ),
                       ),
                     ],
-
                     if (authViewModel.error != null &&
                         !authViewModel.isLoading) ...[
                       const SizedBox(height: 20),
