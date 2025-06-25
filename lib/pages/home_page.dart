@@ -12,6 +12,7 @@ import '../viewmodels/auth_viewmodel.dart';
 import '../widgets/app_top_bar.dart';
 import '../models/api_response.dart';
 import '../models/banner_entity.dart';
+import '../models/portrait_entity.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,17 +25,13 @@ class _HomePageState extends State<HomePage> {
   late final PageController _bannerPageController;
   int _currentPage = 0;
   Timer? _bannerTimer;
-  List<String> _bannerImageUrls = [];
-  bool _isBannerLoading = true;
-
   final Dio _dio = Dio();
 
-  final List<String> _gridImagePaths = [
-    'assets/images/cat5.jpg',
-    'assets/images/cat6.jpg',
-    'assets/images/cat7.jpg',
-    'assets/images/cat8.jpg',
-  ];
+  // --- State管理的数据 ---
+  bool _isLoading = true;
+  String? _error;
+  List<BannerEntity> _banners = [];
+  List<PortraitEntity> _historyPortraits = [];
 
   @override
   void initState() {
@@ -51,58 +48,86 @@ class _HomePageState extends State<HomePage> {
       maxWidth: 90,
     ));
 
-    _fetchBanners();
+    _fetchData();
   }
 
-  Future<void> _fetchBanners() async {
+  Future<void> _fetchData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     final authViewModel = context.read<AuthViewModel>();
     if (authViewModel.token == null || authViewModel.token!.isEmpty) {
-      if (mounted) setState(() => _isBannerLoading = false);
+      if (mounted) {
+        setState(() {
+          _error = "用户未登录";
+          _isLoading = false;
+        });
+      }
       return;
     }
 
     try {
-      // --- 最终修正: 使用从api.dart文件中确认的正确URL ---
-      final response = await _dio.get(
-        'https://www.xiaohongmaoai.com/app/banner/list', // 使用100%正确的URL
+      // 1. 调用Banner接口
+      final bannerResponse = await _dio.get(
+        'https://www.xiaohongmaoai.com/app/banner/list',
         queryParameters: {'bannerPlace': '4'},
-        options: Options(
-          headers: {'Authorization': authViewModel.token},
-        ),
+        options: Options(headers: {'Authorization': authViewModel.token}),
       );
-
-      final apiResponse = ApiResponse.fromJson(
-        response.data,
-        (json) =>
-            (json as List).map((item) => BannerEntity.fromJson(item)).toList(),
-      );
-
-      if (apiResponse.isSuccess && apiResponse.data != null) {
-        final List<String> fetchedUrls =
-            apiResponse.data!.map((banner) => banner.imgUrl).toList();
-        if (mounted) {
-          setState(() {
-            _bannerImageUrls = fetchedUrls;
-            _isBannerLoading = false;
-          });
-          _startBannerTimer();
-        }
+      final bannerApiResponse = ApiResponse.fromJson(
+          bannerResponse.data,
+          (json) =>
+              (json as List).map((i) => BannerEntity.fromJson(i)).toList());
+      if (bannerApiResponse.isSuccess && bannerApiResponse.data != null) {
+        if (mounted) setState(() => _banners = bannerApiResponse.data!);
       } else {
-        if (mounted) setState(() => _isBannerLoading = false);
+        _error = "获取Banner失败: ${bannerApiResponse.msg}";
+      }
+
+      // 2. 调用v1.0版本的历史记录接口
+      final historyResponse = await _dio.post(
+        'https://www.xiaohongmaoai.com/app/petExhibition/getExhibitionList',
+        data: {'currentPage': 1, 'pageSize': 100, 'type': '2'},
+        options: Options(headers: {'Authorization': authViewModel.token}),
+      );
+
+      final historyApiResponse = ApiResponse.fromJson(
+          historyResponse.data,
+          (json) =>
+              (json as List).map((i) => PortraitEntity.fromJson(i)).toList());
+
+      if (historyApiResponse.isSuccess && historyApiResponse.data != null) {
+        // --- 核心修改：只取返回数据的前6张图片 ---
+        // 使用 .take(6) 可以安全地截取列表，如果列表长度小于6，则会取所有元素
+        final limitedHistory = historyApiResponse.data!.take(6).toList();
+        if (mounted) setState(() => _historyPortraits = limitedHistory);
+      } else {
+        _error = _error ?? "获取相册记录失败: ${historyApiResponse.msg}";
       }
     } catch (e) {
-      if (mounted) setState(() => _isBannerLoading = false);
-      debugPrint('获取Banner失败: $e');
+      if (mounted) setState(() => _error = "数据加载时发生网络异常: $e");
+      debugPrint('数据获取失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (_banners.isNotEmpty) {
+          _startBannerTimer();
+        }
+      }
     }
   }
 
   void _startBannerTimer() {
     _bannerTimer?.cancel();
-    if (_bannerImageUrls.isEmpty) return;
+    if (_banners.isEmpty) return;
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_bannerPageController.hasClients) {
         int nextPage =
-            (_bannerPageController.page!.round() + 1) % _bannerImageUrls.length;
+            (_bannerPageController.page!.round() + 1) % _banners.length;
         _bannerPageController.animateToPage(
           nextPage,
           duration: const Duration(milliseconds: 400),
@@ -131,31 +156,23 @@ class _HomePageState extends State<HomePage> {
         ),
         SafeArea(
           bottom: false,
-          child: SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
-                const AppTopBar(),
-                const SizedBox(height: 20),
-                _buildMenuButtons(context),
-                const SizedBox(height: 20),
-                _buildBanner(),
-                const SizedBox(height: 24),
-                const Text('相册',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text('拍摄完的AI作品显示在此',
-                    style: TextStyle(color: Colors.white70, fontSize: 14)),
-                const SizedBox(height: 20),
-                _buildImageGrid(),
-                const SizedBox(height: 30),
-                _buildCreateButton(),
-                const SizedBox(height: 100),
-              ],
+          child: RefreshIndicator(
+            onRefresh: _fetchData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+                  const AppTopBar(),
+                  const SizedBox(height: 20),
+                  _buildMenuButtons(context),
+                  const SizedBox(height: 20),
+                  _buildBannerSection(),
+                  const SizedBox(height: 24),
+                  _buildAlbumSection(),
+                  const SizedBox(height: 120),
+                ],
+              ),
             ),
           ),
         ),
@@ -163,20 +180,128 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildBanner() {
-    if (_isBannerLoading) {
+  Widget _buildBannerSection() {
+    if (_isLoading && _banners.isEmpty) {
       return const SizedBox(
-        height: 180,
-        child: Center(child: CircularProgressIndicator(color: Colors.white)),
-      );
+          height: 180,
+          child: Center(child: CircularProgressIndicator(color: Colors.white)));
     }
-    if (_bannerImageUrls.isEmpty) {
+    if (_error != null && _banners.isEmpty) {
+      return SizedBox(
+          height: 180,
+          child: Center(
+              child: Text(_error!,
+                  style: const TextStyle(color: Colors.white70))));
+    }
+    if (_banners.isEmpty) {
       return const SizedBox(
-        height: 180,
+          height: 180,
+          child: Center(
+              child: Text('暂无推荐内容', style: TextStyle(color: Colors.white70))));
+    }
+    return _buildBannerUI();
+  }
+
+  Widget _buildAlbumSection() {
+    return Column(
+      children: [
+        const Text('相册',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        const Text('拍摄完的AI作品显示在此',
+            style: TextStyle(color: Colors.white70, fontSize: 14)),
+        const SizedBox(height: 20),
+        if (!_isLoading)
+          _historyPortraits.isEmpty
+              ? _buildEmptyAlbumState(context)
+              : _buildImageGrid(),
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: CircularProgressIndicator(color: Colors.white),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildImageGrid() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _historyPortraits.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 3 / 4,
+        ),
+        itemBuilder: (context, index) {
+          final portrait = _historyPortraits[index];
+          return Hero(
+            tag: portrait.imgUrl,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: GestureDetector(
+                onTap: () {
+                  context.push('/photo-view', extra: portrait.imgUrl);
+                },
+                child: CachedNetworkImage(
+                  imageUrl: portrait.imgUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      Container(color: Colors.black.withOpacity(0.2)),
+                  errorWidget: (context, url, error) =>
+                      const Icon(Icons.error, color: Colors.white70),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyAlbumState(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        context.push('/creation-store');
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+        ),
         child: Center(
-            child: Text('暂无推荐内容', style: TextStyle(color: Colors.white70))),
-      );
-    }
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.camera_enhance_outlined,
+                  color: Colors.white70, size: 40),
+              SizedBox(height: 12),
+              Text(
+                '点击制作你的第一张AI写真',
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBannerUI() {
+    int currentPage = _bannerPageController.hasClients
+        ? _bannerPageController.page?.round() ?? 0
+        : 0;
+
     return SizedBox(
       height: 180,
       child: Stack(
@@ -184,19 +309,16 @@ class _HomePageState extends State<HomePage> {
         children: [
           PageView.builder(
             controller: _bannerPageController,
-            itemCount: _bannerImageUrls.length,
-            onPageChanged: (page) {
-              setState(() {
-                _currentPage = page;
-              });
-            },
+            itemCount: _banners.length,
+            onPageChanged: (page) => setState(() => _currentPage = page),
             itemBuilder: (context, index) {
+              final banner = _banners[index];
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 8.0),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: CachedNetworkImage(
-                    imageUrl: _bannerImageUrls[index],
+                    imageUrl: banner.imgUrl,
                     fit: BoxFit.cover,
                     placeholder: (context, url) =>
                         Container(color: Colors.black.withOpacity(0.2)),
@@ -212,7 +334,7 @@ class _HomePageState extends State<HomePage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                _bannerImageUrls.length,
+                _banners.length,
                 (index) => _buildDotIndicator(index),
               ),
             ),
@@ -222,32 +344,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildImageGrid() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: GridView.builder(
-        itemCount: _gridImagePaths.length,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 3 / 4,
-        ),
-        itemBuilder: (context, index) {
-          final imagePath = _gridImagePaths[index];
-          return GestureDetector(
-            onTap: () => context.push('/photo-view', extra: imagePath),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Hero(
-                tag: imagePath,
-                child: Image.asset(imagePath, fit: BoxFit.cover),
-              ),
-            ),
-          );
-        },
+  Widget _buildDotIndicator(int index) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      margin: const EdgeInsets.symmetric(horizontal: 4.0),
+      height: 8.0,
+      width: _currentPage == index ? 24.0 : 8.0,
+      decoration: BoxDecoration(
+        color: _currentPage == index ? Colors.white : Colors.white54,
+        borderRadius: BorderRadius.circular(12),
       ),
     );
   }
@@ -285,34 +390,6 @@ class _HomePageState extends State<HomePage> {
         Text(label,
             style: const TextStyle(color: Colors.white70, fontSize: 12)),
       ],
-    );
-  }
-
-  Widget _buildCreateButton() {
-    return ElevatedButton.icon(
-      onPressed: () {},
-      icon: const Icon(Icons.camera_alt, color: Colors.white),
-      label: const Text('点击制作',
-          style: TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF7A5CFA),
-        padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-      ),
-    );
-  }
-
-  Widget _buildDotIndicator(int index) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      margin: const EdgeInsets.symmetric(horizontal: 4.0),
-      height: 8.0,
-      width: _currentPage == index ? 24.0 : 8.0,
-      decoration: BoxDecoration(
-        color: _currentPage == index ? Colors.white : Colors.white54,
-        borderRadius: BorderRadius.circular(12),
-      ),
     );
   }
 }

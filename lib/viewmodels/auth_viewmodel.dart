@@ -13,7 +13,6 @@ enum AuthStatus { initializing, authenticated, unauthenticated }
 
 class AuthViewModel extends ChangeNotifier {
   late final Dio _dio;
-  // AuthViewModel现在持有一个UserViewModel的实例
   final UserViewModel _userViewModel;
 
   AuthStatus _authStatus = AuthStatus.initializing;
@@ -26,7 +25,6 @@ class AuthViewModel extends ChangeNotifier {
   String? get error => _error;
   String? get token => _token;
 
-  // 修改构造函数以接收注入的UserViewModel
   AuthViewModel(this._userViewModel) {
     _dio = Dio();
     if (kDebugMode) {
@@ -42,7 +40,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // 用于App启动时，验证本地Token的有效性
   Future<void> validateToken() async {
     final prefs = await SharedPreferences.getInstance();
     final storedToken = prefs.getString('auth_token');
@@ -61,7 +58,7 @@ class AuthViewModel extends ChangeNotifier {
       if (_userViewModel.error == null) {
         _authStatus = AuthStatus.authenticated;
       } else {
-        await _logoutInternal(); // 验证失败，静默登出
+        await _logoutInternal();
         _authStatus = AuthStatus.unauthenticated;
       }
     } catch (e) {
@@ -72,7 +69,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // 登录成功后的逻辑
   Future<void> _loginSuccess(String newToken) async {
     _isLoading = true;
     _error = null;
@@ -98,13 +94,17 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // 登出
+  // --- 核心修改: 修正logout方法 ---
   Future<void> logout() async {
+    // 1. 调用内部方法，清除token和用户信息
     await _logoutInternal();
+    // 2. [关键] 手动将认证状态更新为“未认证”
+    _authStatus = AuthStatus.unauthenticated;
+    // 3. 通知所有监听者（包括GoRouter），状态已改变
     notifyListeners();
   }
 
-  // 内部登出方法，不通知监听器，供内部调用
+  // 内部登出方法，负责清理工作
   Future<void> _logoutInternal() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
@@ -112,7 +112,6 @@ class AuthViewModel extends ChangeNotifier {
     _userViewModel.clearUser();
   }
 
-  // 使用短信登录
   Future<void> loginWithSms(String phone, String code) async {
     _isLoading = true;
     _error = null;
@@ -146,7 +145,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // 发送短信验证码
   Future<bool> sendSmsCode(String phone) async {
     _isLoading = true;
     _error = null;
@@ -186,7 +184,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // 清除错误信息
   void clearError() {
     if (_error != null) {
       _error = null;
@@ -194,7 +191,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // 测试登录
   Future<void> loginForTest() async {
     const testToken =
         "eyJhbGciOiJIUzUxMiJ9.eyJhcHBfbG9naW5fdXNlcl9rZXkiOiI5OTA1Zjk1ZS0wNTQ2LTQxZDUtOGNiYi0xYmIwZmM2ZTNjOTYifQ.b425YQcnKoZQaktUqK8k4WqDMzFYaOiGFFbJWrAiDALSEi59yoNdRqWhUZzcJpanKmyyilFcytrl1w9sglIxyw";
