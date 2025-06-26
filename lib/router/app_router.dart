@@ -12,6 +12,7 @@ import '../pages/photo_view_page.dart';
 import '../pages/package_detail_page.dart';
 import '../pages/login_page.dart';
 import '../pages/splash_page.dart';
+import '../pages/packages_by_category_page.dart';
 import '../viewmodels/auth_viewmodel.dart';
 
 GoRouter createAppRouter(BuildContext context) {
@@ -21,34 +22,35 @@ GoRouter createAppRouter(BuildContext context) {
     navigatorKey: GlobalKey<NavigatorState>(),
     initialLocation: '/splash',
     refreshListenable: authViewModel,
-    // redirect逻辑成为唯一的导航决策者
+    // --- 核心修改：使用更健壮的重定向逻辑 ---
     redirect: (BuildContext context, GoRouterState state) {
       final authStatus = authViewModel.authStatus;
       final location = state.uri.toString();
 
-      // 1. 如果还在初始化中，且当前不在启动页，则强制导航到启动页
+      // 规则1：如果App还在初始化，必须停留在/splash页面
       if (authStatus == AuthStatus.initializing) {
+        // 如果当前已经是/splash，则返回null避免循环；否则强制跳转到/splash
         return location == '/splash' ? null : '/splash';
       }
 
       final isLoggedIn = authStatus == AuthStatus.authenticated;
 
-      // 2. 如果用户已登录
-      if (isLoggedIn) {
-        // 如果用户已登录，但当前页面是启动页或登录页，则强制导航到主页
-        if (location == '/splash' || location == '/login') {
-          return '/intro';
-        }
-      }
-      // 3. 如果用户未登录
-      else {
-        // 如果用户未登录，但当前不在登录页，则强制导航到登录页
-        if (location != '/login') {
-          return '/login';
-        }
+      // 从这里开始，我们知道App已不再初始化。
+
+      // 规则2：如果用户未登录 (unauthenticated)
+      if (!isLoggedIn) {
+        // 那么，无论他们想去哪里，只要不是登录页本身，都强制送到登录页。
+        // 这条规则会正确处理从 /splash 或 /profile 跳转过来的情况。
+        return location == '/login' ? null : '/login';
       }
 
-      // 4. 其他所有情况（如已登录访问主页，未登录访问登录页），不进行任何操作
+      // 规则3：如果用户已登录 (authenticated)
+      // 但他们正位于启动页或登录页（通常是刚登录成功后），则强制送他们到主页。
+      if (location == '/splash' || location == '/login') {
+        return '/intro';
+      }
+
+      // 规则4：如果用户已登录，并且访问的是App内部的其他常规页面，则不进行任何重定向。
       return null;
     },
     routes: [
@@ -91,6 +93,17 @@ GoRouter createAppRouter(BuildContext context) {
       GoRoute(
         path: '/package-detail',
         builder: (context, state) => const PackageDetailPage(),
+      ),
+      GoRoute(
+        path: '/packages-by-category',
+        builder: (context, state) {
+          // 确保extra是一个字符串
+          if (state.extra is String) {
+            final categoryName = state.extra as String;
+            return PackagesByCategoryPage(categoryName: categoryName);
+          }
+          return const Scaffold(body: Center(child: Text("页面参数错误")));
+        },
       ),
     ],
   );

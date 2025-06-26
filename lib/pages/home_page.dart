@@ -137,6 +137,33 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // ===================================================================
+  // --- 核心修改 1: 新增 Banner 点击事件处理方法 ---
+  // ===================================================================
+  /// @description 处理Banner点击事件
+  /// @param banner 被点击的Banner实体对象
+  void _onBannerTapped(BannerEntity banner) {
+    debugPrint(
+        "Banner Tapped: title=${banner.title}, type=${banner.bannerType}");
+
+    // 根据 bannerType 执行不同的跳转逻辑
+    switch (banner.bannerType) {
+      case '2':
+        // bannerType为'2'，跳转到创作/商店页面
+        context.push('/creation-store');
+        break;
+      case '3':
+        // bannerType为'3'，跳转到会员充值页面
+        context.push('/membership-recharge');
+        break;
+      default:
+        // 对于其他未知的 bannerType，可以不执行任何操作，或打印日志
+        debugPrint("未知的 Banner 类型: ${banner.bannerType}");
+        break;
+    }
+  }
+  // ===================================================================
+
   @override
   void dispose() {
     _bannerPageController.dispose();
@@ -149,7 +176,7 @@ class _HomePageState extends State<HomePage> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset('assets/images/cat9.jpg', fit: BoxFit.cover),
+        Image.asset('assets/images/cat1.jpg', fit: BoxFit.cover),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
           child: Container(color: Colors.black.withOpacity(0.2)),
@@ -298,10 +325,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildBannerUI() {
-    int currentPage = _bannerPageController.hasClients
-        ? _bannerPageController.page?.round() ?? 0
-        : 0;
-
+    // 这部分移除了 currentPage 变量，因为 initState 中已经有了 _currentPage
     return SizedBox(
       height: 180,
       child: Stack(
@@ -313,20 +337,28 @@ class _HomePageState extends State<HomePage> {
             onPageChanged: (page) => setState(() => _currentPage = page),
             itemBuilder: (context, index) {
               final banner = _banners[index];
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: CachedNetworkImage(
-                    imageUrl: banner.imgUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) =>
-                        Container(color: Colors.black.withOpacity(0.2)),
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.error, color: Colors.white70),
+              // ===================================================================
+              // --- 核心修改 2: 使用 GestureDetector 包裹 Banner 项 ---
+              // ===================================================================
+              return GestureDetector(
+                // 点击时调用我们新增的处理方法
+                onTap: () => _onBannerTapped(banner),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: CachedNetworkImage(
+                      imageUrl: banner.imgUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) =>
+                          Container(color: Colors.black.withOpacity(0.2)),
+                      errorWidget: (context, url, error) =>
+                          const Icon(Icons.error, color: Colors.white70),
+                    ),
                   ),
                 ),
               );
+              // ===================================================================
             },
           ),
           Positioned(

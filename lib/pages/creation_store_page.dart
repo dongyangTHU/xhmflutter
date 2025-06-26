@@ -3,8 +3,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart'; // 1. 导入 Provider
-import '../viewmodels/user_viewmodel.dart'; // 2. 导入 UserViewModel
+import 'package:provider/provider.dart';
+import '../viewmodels/user_viewmodel.dart';
 
 class CreationStorePage extends StatefulWidget {
   const CreationStorePage({super.key});
@@ -61,13 +61,10 @@ class _CreationStorePageState extends State<CreationStorePage>
         icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
         onPressed: () => context.pop(),
       ),
-      title: const Text(
-        '写真商店',
-        style: TextStyle(color: Colors.white, fontSize: 18),
-      ),
+      title: const Text('写真商店',
+          style: TextStyle(color: Colors.white, fontSize: 18)),
       centerTitle: true,
       actions: [
-        // --- 核心修改: 监听 UserViewModel 来动态显示余额 ---
         Padding(
           padding: const EdgeInsets.only(right: 16.0),
           child: Consumer<UserViewModel>(
@@ -85,7 +82,7 @@ class _CreationStorePageState extends State<CreationStorePage>
                     const Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
                     const SizedBox(width: 4),
                     Text(
-                      balance, // 3. 使用动态余额
+                      balance,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -117,11 +114,8 @@ class _CreationStorePageState extends State<CreationStorePage>
   }
 }
 
-// ... PetPhotoView 和 HumanPetPhotoView 等其他代码保持不变 ...
-
 class PetPhotoView extends StatefulWidget {
   const PetPhotoView({super.key});
-
   @override
   State<PetPhotoView> createState() => _PetPhotoViewState();
 }
@@ -182,7 +176,6 @@ class _PetPhotoViewState extends State<PetPhotoView> {
 
   Widget _buildAutoScrollBanner() {
     if (_bannerImages.isEmpty) return const SizedBox.shrink();
-
     return SizedBox(
       height: 150,
       child: Stack(
@@ -191,17 +184,11 @@ class _PetPhotoViewState extends State<PetPhotoView> {
           PageView.builder(
             controller: _bannerPageController,
             itemCount: _bannerImages.length,
-            onPageChanged: (page) {
-              setState(() {
-                _bannerCurrentPage = page;
-              });
-            },
-            itemBuilder: (context, index) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(16.0),
-                child: Image.asset(_bannerImages[index], fit: BoxFit.cover),
-              );
-            },
+            onPageChanged: (page) => setState(() => _bannerCurrentPage = page),
+            itemBuilder: (context, index) => ClipRRect(
+              borderRadius: BorderRadius.circular(16.0),
+              child: Image.asset(_bannerImages[index], fit: BoxFit.cover),
+            ),
           ),
           Positioned(
             bottom: 10.0,
@@ -240,16 +227,13 @@ class HumanPetPhotoView extends StatelessWidget {
         children: [
           ElevatedButton.icon(
             icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text(
-              '创建个人AI形象',
-              style: TextStyle(color: Colors.white),
-            ),
+            label:
+                const Text('创建个人AI形象', style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white.withOpacity(0.1),
               minimumSize: const Size(double.infinity, 50),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+                  borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
             onPressed: () {},
@@ -264,12 +248,9 @@ class HumanPetPhotoView extends StatelessWidget {
   }
 }
 
-Widget _buildSection(
-  BuildContext context,
-  String title,
-  String subtitle, {
-  required bool isPet,
-}) {
+// --- 核心修改：为“更多套系”添加点击事件 ---
+Widget _buildSection(BuildContext context, String title, String subtitle,
+    {required bool isPet}) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -279,23 +260,25 @@ Widget _buildSection(
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text(title,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
+              Text(subtitle,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14)),
             ],
           ),
-          const Text('更多套系 >',
-              style: TextStyle(color: Colors.white70, fontSize: 14)),
+          // 使用GestureDetector包裹，使其可以被点击
+          GestureDetector(
+            onTap: () {
+              // 点击后，跳转到新页面，并把分类标题(title)这个字符串作为参数传递
+              context.push('/packages-by-category', extra: title);
+            },
+            child: const Text('更多套系 >',
+                style: TextStyle(color: Colors.white70, fontSize: 14)),
+          ),
         ],
       ),
       const SizedBox(height: 16),
@@ -304,10 +287,8 @@ Widget _buildSection(
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           itemCount: 3,
-          itemBuilder: (context, index) {
-            return _buildPhotoCard(
-                context: context, isPet: isPet, index: index);
-          },
+          itemBuilder: (context, index) =>
+              _buildPhotoCard(context: context, isPet: isPet, index: index),
         ),
       ),
     ],
@@ -319,20 +300,18 @@ Widget _buildPhotoCard(
   final petImages = [
     'assets/images/cat5.jpg',
     'assets/images/cat6.jpg',
-    'assets/images/cat7.jpg',
+    'assets/images/cat7.jpg'
   ];
   final humanPetImages = [
     'assets/images/cat1.jpg',
     'assets/images/cat2.jpg',
-    'assets/images/cat3.jpg',
+    'assets/images/cat3.jpg'
   ];
   final images = isPet ? petImages : humanPetImages;
   final price = isPet ? '299' : '599';
 
   return GestureDetector(
-    onTap: () {
-      context.push('/package-detail');
-    },
+    onTap: () => context.push('/package-detail'),
     child: Container(
       width: 160,
       margin: const EdgeInsets.only(right: 12),
@@ -342,11 +321,8 @@ Widget _buildPhotoCard(
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                images[index % images.length],
-                fit: BoxFit.cover,
-                width: double.infinity,
-              ),
+              child: Image.asset(images[index % images.length],
+                  fit: BoxFit.cover, width: double.infinity),
             ),
           ),
           const SizedBox(height: 8),
@@ -356,31 +332,21 @@ Widget _buildPhotoCard(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                  Text(
-                    '套系名称',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text('套系名称',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
                   SizedBox(height: 2),
-                  Text(
-                    '节日盛典 | 8.8万用户使用',
-                    style: TextStyle(color: Colors.white70, fontSize: 10),
-                  ),
+                  Text('节日盛典 | 8.8万用户使用',
+                      style: TextStyle(color: Colors.white70, fontSize: 10)),
                 ],
               ),
               Row(
                 children: [
                   const Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
                   const SizedBox(width: 2),
-                  Text(
-                    price,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text(price,
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
