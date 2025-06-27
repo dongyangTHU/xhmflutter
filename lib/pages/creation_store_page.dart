@@ -4,7 +4,13 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+// --- 核心修改：导入必要的包 ---
+import 'package:dio/dio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../viewmodels/user_viewmodel.dart';
+import '../viewmodels/auth_viewmodel.dart'; // 导入AuthViewModel
+import '../models/api_response.dart'; // 导入统一响应模型
+import '../models/banner_entity.dart'; // 导入Banner模型
 
 class CreationStorePage extends StatefulWidget {
   const CreationStorePage({super.key});
@@ -124,25 +130,84 @@ class _PetPhotoViewState extends State<PetPhotoView> {
   late final PageController _bannerPageController;
   int _bannerCurrentPage = 0;
   Timer? _bannerTimer;
+  final Dio _dio = Dio();
 
-  final List<String> _bannerImages = [
-    'assets/images/cat2.jpg',
-    'assets/images/cat5.jpg',
-    'assets/images/cat6.jpg',
-  ];
+  bool _isLoading = true;
+  String? _error;
+  List<BannerEntity> _banners = [];
 
   @override
   void initState() {
     super.initState();
     _bannerPageController = PageController();
-    _startBannerTimer();
+    _fetchBanners();
+  }
+
+  // --- 核心修改: 修正获取 Banner 数据的 API 调用参数 ---
+  Future<void> _fetchBanners() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final authViewModel = context.read<AuthViewModel>();
+    final token = authViewModel.token;
+
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _error = "用户未登录，无法加载数据";
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      // 调用v1.0的Banner接口，并传入正确的 '5' 作为 bannerPlace
+      // 这个 '5' 是从 v1.0 的 lib/pages/ai/ai_logic.dart 文件中找到的
+      final response = await _dio.get(
+        'https://www.xiaohongmaoai.com/app/banner/list',
+        queryParameters: {'bannerPlace': '5'}, // **关键修正: 使用 '5'**
+        options: Options(headers: {'Authorization': token}),
+      );
+
+      final apiResponse = ApiResponse.fromJson(
+        response.data,
+        (json) => (json as List).map((i) => BannerEntity.fromJson(i)).toList(),
+      );
+
+      if (mounted) {
+        if (apiResponse.isSuccess && apiResponse.data != null) {
+          setState(() {
+            _banners = apiResponse.data!;
+            _isLoading = false;
+          });
+          _startBannerTimer();
+        } else {
+          setState(() {
+            _error = "获取Banner失败: ${apiResponse.msg}";
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = "网络请求失败: $e";
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _startBannerTimer() {
-    if (!mounted) return;
+    _bannerTimer?.cancel();
+    if (!mounted || _banners.isEmpty) return;
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!_bannerPageController.hasClients || _bannerImages.isEmpty) return;
-      int nextPage = (_bannerCurrentPage + 1) % _bannerImages.length;
+      if (!_bannerPageController.hasClients) return;
+      int nextPage = (_bannerCurrentPage + 1) % _banners.length;
       _bannerPageController.animateToPage(
         nextPage,
         duration: const Duration(milliseconds: 400),
@@ -175,7 +240,43 @@ class _PetPhotoViewState extends State<PetPhotoView> {
   }
 
   Widget _buildAutoScrollBanner() {
-    if (_bannerImages.isEmpty) return const SizedBox.shrink();
+    if (_isLoading) {
+      return Container(
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        child:
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+
+    if (_error != null) {
+      return Container(
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        child: Center(
+            child: Text('加载失败: $_error',
+                style: const TextStyle(color: Colors.white70))),
+      );
+    }
+
+    if (_banners.isEmpty) {
+      return Container(
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        child: const Center(
+            child: Text('暂无推荐内容', style: TextStyle(color: Colors.white70))),
+      );
+    }
+
     return SizedBox(
       height: 150,
       child: Stack(
@@ -183,18 +284,26 @@ class _PetPhotoViewState extends State<PetPhotoView> {
         children: [
           PageView.builder(
             controller: _bannerPageController,
-            itemCount: _bannerImages.length,
+            itemCount: _banners.length,
             onPageChanged: (page) => setState(() => _bannerCurrentPage = page),
             itemBuilder: (context, index) => ClipRRect(
               borderRadius: BorderRadius.circular(16.0),
-              child: Image.asset(_bannerImages[index], fit: BoxFit.cover),
+              child: CachedNetworkImage(
+                imageUrl: _banners[index].imgUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: Colors.white.withOpacity(0.1),
+                ),
+                errorWidget: (context, url, error) =>
+                    const Icon(Icons.error, color: Colors.white),
+              ),
             ),
           ),
           Positioned(
             bottom: 10.0,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_bannerImages.length, (index) {
+              children: List.generate(_banners.length, (index) {
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
                   margin: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -216,6 +325,7 @@ class _PetPhotoViewState extends State<PetPhotoView> {
   }
 }
 
+// 以下代码保持不变
 class HumanPetPhotoView extends StatelessWidget {
   const HumanPetPhotoView({super.key});
 
@@ -248,7 +358,6 @@ class HumanPetPhotoView extends StatelessWidget {
   }
 }
 
-// --- 核心修改：为“更多套系”添加点击事件 ---
 Widget _buildSection(BuildContext context, String title, String subtitle,
     {required bool isPet}) {
   return Column(
@@ -270,10 +379,8 @@ Widget _buildSection(BuildContext context, String title, String subtitle,
                   style: const TextStyle(color: Colors.white70, fontSize: 14)),
             ],
           ),
-          // 使用GestureDetector包裹，使其可以被点击
           GestureDetector(
             onTap: () {
-              // 点击后，跳转到新页面，并把分类标题(title)这个字符串作为参数传递
               context.push('/packages-by-category', extra: title);
             },
             child: const Text('更多套系 >',

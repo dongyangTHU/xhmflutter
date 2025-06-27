@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   image_picker: ^1.1.2
   cupertino_icons: ^1.0.8
+  flutter_svg: ^2.0.10+1 # 添加这一行 (版本号可能更新，以最新为准)
   
   # 请添加下面这两行
   go_router: ^14.1.0
@@ -31,3 +32,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/svgs/
+    #- assets/images/2.0x/ # 声明2.0x文件夹
+    #- assets/images/3.0x/ # 声明3.0x文件夹

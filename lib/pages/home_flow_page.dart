@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/home_flow_viewmodel.dart';
-import 'intro_page.dart';
+//import 'intro_page.dart';
 import 'home_page.dart';
 
 class HomeFlowPage extends StatelessWidget {
@@ -20,7 +20,7 @@ class HomeFlowPage extends StatelessWidget {
       scrollDirection: Axis.vertical,
       physics: const ClampingScrollPhysics(),
       children: const [
-        IntroPage(),
+        
         HomePage(),
       ],
     );

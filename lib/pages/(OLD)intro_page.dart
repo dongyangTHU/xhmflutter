@@ -1,7 +1,6 @@
-// lib/pages/intro_page.dart
-
-import 'dart:ui'; // 引入ImageFilter需要这个包
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../widgets/app_top_bar.dart';
@@ -9,28 +8,52 @@ import '../widgets/app_top_bar.dart';
 class IntroPage extends StatelessWidget {
   const IntroPage({super.key});
 
-  Widget _buildMenuButton(IconData icon, String label) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.35),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
+  Widget _buildMenuButton(BuildContext context, IconData icon, String label, String? route) {
+    return GestureDetector(
+      onTap: () {
+        if (route != null) {
+          context.push(route);
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56, // 缩小按钮尺寸
+            height: 56,
+            decoration: BoxDecoration(
+              boxShadow: [ // 添加投影效果
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  offset: const Offset(0, 2),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SvgPicture.asset(
+                  'assets/svgs/menu_button_bg.svg',
+                  width: 56, // 缩小 SVG 尺寸
+                  height: 56,
+                ),
+                Icon(icon, color: Colors.white, size: 24), // 稍微缩小图标
+              ],
+            ),
           ),
-          child: Icon(icon, color: Colors.white, size: 28),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11, // 稍微缩小文字
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -53,11 +76,10 @@ class IntroPage extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.1),
+                Colors.black.withOpacity(0.3), // 稍微调整透明度
                 Colors.transparent,
-                Colors.black.withOpacity(0.4),
               ],
-              stops: const [0.0, 0.5, 1.0],
+              stops: const [0.0, 0.25], // 调整渐变范围到顶部 25%
             ),
           ),
         ),
@@ -114,11 +136,6 @@ class IntroPage extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // --- 关键布局修改 ---
-              // 1. 将按钮和弧形装饰分离为两个独立的 Positioned 组件
-
-              // 按钮组，位置保持不变
               Positioned(
                 bottom: 80,
                 left: 16,
@@ -126,33 +143,23 @@ class IntroPage extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    GestureDetector(
-                      onTap: () {
-                        context.push('/creation-store');
-                      },
-                      child: _buildMenuButton(Icons.add_circle_outline, '开始创作'),
-                    ),
-                    _buildMenuButton(Icons.pets, '我的宠物'),
-                    _buildMenuButton(Icons.photo_library_outlined, '每日写真'),
-                    _buildMenuButton(Icons.back_hand_outlined, '偷只小猫'),
+                    _buildMenuButton(context, Icons.add_circle_outline, '开始创作', '/creation-store'),
+                    _buildMenuButton(context, Icons.pets, '我的宠物', null),
+                    _buildMenuButton(context, Icons.photo_library_outlined, '每日写真', null),
+                    _buildMenuButton(context, Icons.back_hand_outlined, '偷只小猫', null),
                   ],
                 ),
               ),
-
-              // 单独的“磨砂玻璃”弧形装饰模块
               Positioned(
                 left: 20,
                 right: 20,
                 bottom: 0,
-                height: 40, // 控制磨砂区域的高度和弧度
+                height: 40,
                 child: ClipPath(
-                  // 使用我们新的 Clipper 来裁剪
                   clipper: _PagePeekClipper(),
                   child: BackdropFilter(
-                    // 应用高斯模糊效果
                     filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
                     child: Container(
-                      // 在模糊层上叠加一层半透明白色，使其呈现“磨砂”质感
                       color: Colors.white.withOpacity(0.35),
                     ),
                   ),
@@ -190,11 +197,9 @@ class _DiagonalLinePainter extends CustomPainter {
   }
 }
 
-// --- 新增 Clipper 类，替换掉 _PagePeekPainter ---
 class _PagePeekClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
-    // 这个路径的逻辑与我们之前绘制实心色块的逻辑完全相同
     const double dipHeight = 40.0;
     final path = Path();
     path.moveTo(0, dipHeight);
@@ -212,7 +217,6 @@ class _PagePeekClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) {
-    // 因为形状是固定的，所以不需要重新裁剪
     return false;
   }
 }
