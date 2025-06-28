@@ -1,3 +1,5 @@
+// lib/pages/home_page.dart
+
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -94,40 +96,49 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // --- 任务2: 优化吸附动画逻辑 ---
+  // --- 代码修改点 ---
+  // 1. 调整吸附阈值，使双向滚动更轻松
+  // 2. 精确计算吸附位置，避免按钮与顶栏重叠
   bool _handleScrollNotification(ScrollNotification notification) {
     if (_isSnapping) return false;
 
-    // 当用户停止拖拽且滚动空闲时，触发判断
     if (notification is UserScrollNotification &&
         notification.direction == ScrollDirection.idle) {
-      // 定义吸附点 (第一屏的高度)
-      final double snapPosition = MediaQuery.of(context).size.height - 100.0;
+      final screenHeight = MediaQuery.of(context).size.height;
+      final double snapPosition = screenHeight - 100.0;
       final double currentOffset = _scrollController.offset;
 
-      // 如果已在内容深处，或在顶部，则不处理
       if (currentOffset > snapPosition || currentOffset < 0) return false;
 
-      // --- 优化点 1: 降低吸附阈值 ---
-      // 原来的阈值是 snapPosition / 2，现在改为 snapPosition / 5
-      // 这意味着用户只需滚动超过第一屏高度的20%，就会触发吸附，感觉更灵敏
-      final double snapThreshold = snapPosition / 5;
+      // 【修改点2】将阈值调整为50%，使上下滑动所需力度对称，更容易吸附回顶部
+      final double snapThreshold = snapPosition / 2;
 
-      // 决定目标位置
-      final double target = (currentOffset >= snapThreshold) ? snapPosition : 0.0;
+      double target = (currentOffset >= snapThreshold) ? snapPosition : 0.0;
 
-      // 如果当前位置和目标位置已经很接近，则不执行动画
+      // 【修改点1】如果目标是吸附到下方，并且相册中有写真
+      if (target == snapPosition && _historyPortraits.isNotEmpty) {
+        // 原吸附点 (snapPosition) 是第一屏的高度 (screenHeight - 100)
+        // 按钮组在第一屏中，其顶部距离第一屏顶部大约为 (snapPosition - 120)
+        // TopBar 区域大约占据屏幕顶部 120px，我们额外加 16px 间距
+        // 目标：让按钮组的顶部(y_btn) - 滚动偏移(target) = TopBar区域高度(136)
+        // (snapPosition - 120) - target = 136
+        // target = snapPosition - 120 - 136 = snapPosition - 256
+        target = snapPosition - 256.0;
+        
+        // 防止计算出的目标位置为负数
+        if (target < 0) {
+          target = 0;
+        }
+      }
+
       if ((target - currentOffset).abs() < 1.0) return false;
 
       _isSnapping = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          // --- 优化点 2: 调整动画速度 ---
           _scrollController
               .animateTo(
                 target,
-                // 原来是 300ms，增加约10%使其变慢，变为 330ms
-                // 你可以在这里调整动画时长，值越大，动画越慢
                 duration: const Duration(milliseconds: 330),
                 curve: Curves.easeOutCubic,
               )
@@ -140,7 +151,6 @@ class _HomePageState extends State<HomePage> {
           _isSnapping = false;
         }
       });
-      // 返回true，消费掉这个通知，防止其他物理效果（如自动再滑动一下）的干扰
       return true;
     }
     return false;
@@ -163,12 +173,10 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: NotificationListener<ScrollNotification>(
-        // 将监听器放在最外层
         onNotification: _handleScrollNotification,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 背景层
             Image.asset('assets/images/cat1.jpg', fit: BoxFit.cover),
             BackdropFilter(
               filter: ImageFilter.blur(sigmaX: _blurAmount, sigmaY: _blurAmount),
@@ -177,8 +185,6 @@ class _HomePageState extends State<HomePage> {
             Container(
               color: Colors.black.withOpacity(_overlayOpacity),
             ),
-
-            // 内容层 (恢复为原来的 CustomScrollView 结构)
             RefreshIndicator(
               onRefresh: _fetchData,
               child: CustomScrollView(
@@ -186,7 +192,6 @@ class _HomePageState extends State<HomePage> {
                 physics: const ClampingScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics()),
                 slivers: [
-                  // Sliver 1: 首页区域
                   SliverToBoxAdapter(
                     child: Container(
                       height: screenHeight - bannerPeekHeight,
@@ -206,8 +211,6 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
-
-                  // Sliver 2, 3, 4: 主内容区
                   SliverToBoxAdapter(child: _buildBannerSection()),
                   const SliverToBoxAdapter(child: SizedBox(height: 24)),
                   SliverToBoxAdapter(child: _buildAlbumSection()),
@@ -215,8 +218,6 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-
-            // UI层: TopBar
             Positioned(
               top: _topBarInitialPadding,
               left: 0,
@@ -231,8 +232,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  // --- 无需更改的私有方法 ---
 
   Future<void> _fetchData() async {
     if (!mounted) return;
@@ -336,16 +335,20 @@ class _HomePageState extends State<HomePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildMenuButton(context, Icons.add_circle, '开始创作', '/creation-store'),
-        _buildMenuButton(context, Icons.pets, '我的宠物', null),
-        _buildMenuButton(context, Icons.photo_library, '每日写真', null),
-        _buildMenuButton(context, Icons.back_hand, '偷只小猫', null),
+        _buildMenuButton(context, 'assets/images/ic_home_1.png', '开始创作',
+            '/creation-store'),
+        _buildMenuButton(
+            context, 'assets/images/ic_home_2.png', '我的宠物', null),
+        _buildMenuButton(
+            context, 'assets/images/ic_home_3.png', '每日写真', null),
+        _buildMenuButton(
+            context, 'assets/images/ic_home_4.png', '偷只小猫', null),
       ],
     );
   }
 
   Widget _buildMenuButton(
-      BuildContext context, IconData icon, String label, String? route) {
+      BuildContext context, String imagePath, String label, String? route) {
     return GestureDetector(
       onTap: () {
         if (route != null) {
@@ -355,7 +358,6 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 任务1: 为按钮添加圆形投影
           Container(
             width: 56,
             height: 56,
@@ -363,10 +365,10 @@ class _HomePageState extends State<HomePage> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.25), // 投影颜色
-                  spreadRadius: 1, // 投影扩展
-                  blurRadius: 4, // 投影模糊半径
-                  offset: const Offset(0, 2), // 投影位置 (向下偏移2)
+                  color: Colors.black.withOpacity(0.25),
+                  spreadRadius: 1,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -378,7 +380,7 @@ class _HomePageState extends State<HomePage> {
                   width: 56,
                   height: 56,
                 ),
-                Icon(icon, color: Colors.white, size: 24),
+                Image.asset(imagePath, width: 24, height: 24),
               ],
             ),
           ),

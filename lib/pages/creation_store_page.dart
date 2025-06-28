@@ -4,13 +4,28 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-// --- 核心修改：导入必要的包 ---
 import 'package:dio/dio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../viewmodels/user_viewmodel.dart';
-import '../viewmodels/auth_viewmodel.dart'; // 导入AuthViewModel
-import '../models/api_response.dart'; // 导入统一响应模型
-import '../models/banner_entity.dart'; // 导入Banner模型
+import '../viewmodels/auth_viewmodel.dart';
+import '../models/api_response.dart';
+import '../models/banner_entity.dart';
+
+// --- 屏幕适配工具 (无变化) ---
+class ScaleUtil {
+  static const double _designWidth = 750.0;
+  static double _screenWidth = 0;
+
+  static void init(BuildContext context) {
+    _screenWidth = MediaQuery.of(context).size.width;
+  }
+
+  static double scale(double value) {
+    if (_screenWidth == 0) return value;
+    return value * _screenWidth / _designWidth;
+  }
+}
 
 class CreationStorePage extends StatefulWidget {
   const CreationStorePage({super.key});
@@ -19,106 +34,197 @@ class CreationStorePage extends StatefulWidget {
   State<CreationStorePage> createState() => _CreationStorePageState();
 }
 
-class _CreationStorePageState extends State<CreationStorePage>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+class _CreationStorePageState extends State<CreationStorePage> with SingleTickerProviderStateMixin {
+  final PageController _pageController = PageController();
+  final _tabController = ValueNotifier('pet');
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!mounted || !_pageController.hasClients) return;
+      if (_tabController.value == 'pet' && _pageController.page != 0) {
+        _pageController.animateToPage(0, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+      } else if (_tabController.value == 'human_pet' && _pageController.page != 1) {
+        _pageController.animateToPage(1, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _pageController.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
-  static const Color _scaffoldBgColor = Color(0xFF1A182E);
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _scaffoldBgColor,
-      appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          _buildTabBar(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: const [
-                PetPhotoView(),
-                HumanPetPhotoView(),
+    ScaleUtil.init(context);
+
+    // --- 核心修复：使用 Stack 作为根 Widget 来确保背景图在最底层 ---
+    return Stack(
+      children: [
+        // 背景层
+        Image.asset(
+          'assets/images/bg_create_store.png',
+          // 确保图片填满整个屏幕
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.cover,
+        ),
+        // 内容层
+        Scaffold(
+          // 必须将 Scaffold 的背景设置为透明，否则它会覆盖 Stack 底层的图片
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                _buildCustomHeader(),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      _tabController.value = index == 0 ? 'pet' : 'human_pet';
+                    },
+                    children: const [
+                      PetPhotoView(),
+                      HumanPetPhotoView(),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  AppBar _buildAppBar() {
-    return AppBar(
-      backgroundColor: _scaffoldBgColor,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
-        onPressed: () => context.pop(),
-      ),
-      title: const Text('写真商店',
-          style: TextStyle(color: Colors.white, fontSize: 18)),
-      centerTitle: true,
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16.0),
-          child: Consumer<UserViewModel>(
-            builder: (context, userViewModel, child) {
-              final balance = userViewModel.userInfo?.balance ?? '...';
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      balance,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
         ),
       ],
     );
   }
 
-  Widget _buildTabBar() {
-    return TabBar(
-      controller: _tabController,
-      labelColor: Colors.white,
-      unselectedLabelColor: Colors.white70,
-      indicatorColor: const Color(0xFF7A5CFA),
-      indicatorWeight: 3,
-      indicatorPadding: const EdgeInsets.symmetric(horizontal: 24),
-      tabs: const [
-        Tab(text: '宠物写真'),
-        Tab(text: '人宠合照'),
-      ],
+  Widget _buildCustomHeader() {
+    return Container(
+      // 头部背景保持透明，以免遮挡背景图
+      color: Colors.transparent,
+      padding: EdgeInsets.symmetric(
+        horizontal: ScaleUtil.scale(32),
+        vertical: ScaleUtil.scale(20),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
+            onPressed: () => context.pop(),
+          ),
+          const Spacer(),
+          _buildCustomSvgSwitch(),
+          const Spacer(flex: 2),
+        ],
+      ),
     );
   }
+
+  Widget _buildCustomSvgSwitch() {
+    const double switchWidth = 352.0;
+    const double switchHeight = 70.0;
+
+    return Container(
+      width: ScaleUtil.scale(switchWidth),
+      height: ScaleUtil.scale(switchHeight),
+      decoration: BoxDecoration(
+        color: Colors.transparent, // 开关背景透明
+        borderRadius: BorderRadius.circular(ScaleUtil.scale(35)),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.6),
+          width: 1.0,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ValueListenableBuilder<String>(
+        valueListenable: _tabController,
+        builder: (context, value, child) {
+          final isPetSelected = value == 'pet';
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final sliderSlotWidth = constraints.maxWidth / 2;
+              final sliderSlotHeight = constraints.maxHeight;
+
+              return Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeInOut,
+                    left: isPetSelected ? 0 : sliderSlotWidth,
+                    child: Container(
+                      width: sliderSlotWidth,
+                      height: sliderSlotHeight,
+                      child: Center(
+                        child: SvgPicture.asset(
+                          'assets/svgs/switch_create_store.svg',
+                          width: sliderSlotWidth * 0.85,
+                          height: sliderSlotHeight * 0.85,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSwitchTab('pet', '宠物写真'),
+                      ),
+                      Expanded(
+                        child: _buildSwitchTab('human_pet', '人宠合照'),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSwitchTab(String value, String text) {
+    // 使用 ValueListenableBuilder 来实时响应 _tabController 的变化
+    return ValueListenableBuilder<String>(
+        valueListenable: _tabController,
+        builder: (context, currentValue, child) {
+          final isSelected = currentValue == value;
+          final activeStyle = TextStyle(
+            color: const Color(0xFF211815),
+            fontWeight: FontWeight.w600,
+            fontFamily: "PingFang SC",
+            fontSize: ScaleUtil.scale(21),
+          );
+          final inactiveStyle = TextStyle(
+            color: Colors.white,
+            fontFamily: "PingFang SC",
+            fontSize: ScaleUtil.scale(21),
+          );
+
+          return GestureDetector(
+            onTap: () {
+              if (_tabController.value != value) {
+                 _tabController.value = value;
+              }
+            },
+            child: Container(
+              color: Colors.transparent,
+              height: double.infinity,
+              alignment: Alignment.center,
+              child: Text(
+                text,
+                style: isSelected ? activeStyle : inactiveStyle,
+              ),
+            ),
+          );
+        });
+  }
 }
+
+// --- PetPhotoView, HumanPetPhotoView, _buildSection, _buildPhotoCard ---
 
 class PetPhotoView extends StatefulWidget {
   const PetPhotoView({super.key});
@@ -126,8 +232,8 @@ class PetPhotoView extends StatefulWidget {
   State<PetPhotoView> createState() => _PetPhotoViewState();
 }
 
-class _PetPhotoViewState extends State<PetPhotoView> {
-  late final PageController _bannerPageController;
+class _PetPhotoViewState extends State<PetPhotoView> with AutomaticKeepAliveClientMixin {
+  final PageController _bannerPageController = PageController();
   int _bannerCurrentPage = 0;
   Timer? _bannerTimer;
   final Dio _dio = Dio();
@@ -137,13 +243,19 @@ class _PetPhotoViewState extends State<PetPhotoView> {
   List<BannerEntity> _banners = [];
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   void initState() {
     super.initState();
-    _bannerPageController = PageController();
-    _fetchBanners();
+    // --- 优化：确保在 Widget 构建完成后再进行网络请求 ---
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+         _fetchBanners();
+      }
+    });
   }
 
-  // --- 核心修改: 修正获取 Banner 数据的 API 调用参数 ---
   Future<void> _fetchBanners() async {
     if (!mounted) return;
     setState(() {
@@ -165,11 +277,9 @@ class _PetPhotoViewState extends State<PetPhotoView> {
     }
 
     try {
-      // 调用v1.0的Banner接口，并传入正确的 '5' 作为 bannerPlace
-      // 这个 '5' 是从 v1.0 的 lib/pages/ai/ai_logic.dart 文件中找到的
       final response = await _dio.get(
         'https://www.xiaohongmaoai.com/app/banner/list',
-        queryParameters: {'bannerPlace': '5'}, // **关键修正: 使用 '5'**
+        queryParameters: {'bannerPlace': '5'},
         options: Options(headers: {'Authorization': token}),
       );
 
@@ -225,39 +335,46 @@ class _PetPhotoViewState extends State<PetPhotoView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+    // SingleChildScrollView 本身是透明的，不会遮挡背景
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(horizontal: ScaleUtil.scale(32)),
       child: Column(
         children: [
+          SizedBox(height: ScaleUtil.scale(30)),
           _buildAutoScrollBanner(),
-          const SizedBox(height: 24),
+          SizedBox(height: ScaleUtil.scale(48)),
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: true),
-          const SizedBox(height: 24),
+          SizedBox(height: ScaleUtil.scale(48)),
           _buildSection(context, '优惠', '超值限时特价套系', isPet: true),
+          SizedBox(height: ScaleUtil.scale(48)),
+          _buildSection(context, '萌宠日常', '记录宠物的每个可爱瞬间', isPet: true),
+          SizedBox(height: ScaleUtil.scale(40)),
         ],
       ),
     );
   }
 
   Widget _buildAutoScrollBanner() {
+    final bannerHeight = ScaleUtil.scale(250);
+
     if (_isLoading) {
       return Container(
-        height: 150,
+        height: bannerHeight,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16.0),
+          color: Colors.white.withOpacity(0.1), // 半透明背景不会完全遮挡
+          borderRadius: BorderRadius.circular(ScaleUtil.scale(32)),
         ),
-        child:
-            const Center(child: CircularProgressIndicator(color: Colors.white)),
+        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
       );
     }
 
     if (_error != null) {
       return Container(
-        height: 150,
+        height: bannerHeight,
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16.0),
+          borderRadius: BorderRadius.circular(ScaleUtil.scale(32)),
         ),
         child: Center(
             child: Text('加载失败: $_error',
@@ -267,10 +384,10 @@ class _PetPhotoViewState extends State<PetPhotoView> {
 
     if (_banners.isEmpty) {
       return Container(
-        height: 150,
+        height: bannerHeight,
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16.0),
+          borderRadius: BorderRadius.circular(ScaleUtil.scale(32)),
         ),
         child: const Center(
             child: Text('暂无推荐内容', style: TextStyle(color: Colors.white70))),
@@ -278,7 +395,7 @@ class _PetPhotoViewState extends State<PetPhotoView> {
     }
 
     return SizedBox(
-      height: 150,
+      height: bannerHeight,
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
@@ -287,7 +404,7 @@ class _PetPhotoViewState extends State<PetPhotoView> {
             itemCount: _banners.length,
             onPageChanged: (page) => setState(() => _bannerCurrentPage = page),
             itemBuilder: (context, index) => ClipRRect(
-              borderRadius: BorderRadius.circular(16.0),
+              borderRadius: BorderRadius.circular(ScaleUtil.scale(32)),
               child: CachedNetworkImage(
                 imageUrl: _banners[index].imgUrl,
                 fit: BoxFit.cover,
@@ -325,33 +442,20 @@ class _PetPhotoViewState extends State<PetPhotoView> {
   }
 }
 
-// 以下代码保持不变
 class HumanPetPhotoView extends StatelessWidget {
   const HumanPetPhotoView({super.key});
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(horizontal: ScaleUtil.scale(32)),
       child: Column(
         children: [
-          ElevatedButton.icon(
-            icon: const Icon(Icons.add, color: Colors.white),
-            label:
-                const Text('创建个人AI形象', style: TextStyle(color: Colors.white)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.1),
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            onPressed: () {},
-          ),
-          const SizedBox(height: 24),
+          SizedBox(height: ScaleUtil.scale(48)),
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: false),
-          const SizedBox(height: 24),
-          _buildSection(context, '优惠', '超值限时特价套系', isPet: true),
+          SizedBox(height: ScaleUtil.scale(48)),
+          _buildSection(context, '优惠', '超值限时特价套系', isPet: false),
+          SizedBox(height: ScaleUtil.scale(40)),
         ],
       ),
     );
@@ -365,32 +469,56 @@ Widget _buildSection(BuildContext context, String title, String subtitle,
     children: [
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
+                      fontSize: ScaleUtil.scale(34),
+                      fontWeight: FontWeight.w600,
+                      fontFamily: "PingFang SC")),
+              SizedBox(height: ScaleUtil.scale(8)),
               Text(subtitle,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                  style: TextStyle(
+                      color: const Color(0xFF808080),
+                      fontSize: ScaleUtil.scale(21),
+                      fontWeight: FontWeight.w400,
+                      fontFamily: "PingFang SC")),
             ],
           ),
           GestureDetector(
             onTap: () {
               context.push('/packages-by-category', extra: title);
             },
-            child: const Text('更多套系 >',
-                style: TextStyle(color: Colors.white70, fontSize: 14)),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: ScaleUtil.scale(24),
+                vertical: ScaleUtil.scale(10),
+              ),
+              decoration: ShapeDecoration(
+                shape: StadiumBorder(
+                  side: BorderSide(
+                    color: const Color(0xFF808080),
+                    width: 1.0,
+                  ),
+                ),
+              ),
+              child: Text('更多套系',
+                  style: TextStyle(
+                      color: const Color(0xFF808080),
+                      fontSize: ScaleUtil.scale(21),
+                      fontWeight: FontWeight.w400,
+                      fontFamily: "PingFang SC")),
+            ),
           ),
         ],
       ),
-      const SizedBox(height: 16),
+      SizedBox(height: ScaleUtil.scale(32)),
       SizedBox(
-        height: 220,
+        height: ScaleUtil.scale(341),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           itemCount: 3,
@@ -415,50 +543,59 @@ Widget _buildPhotoCard(
     'assets/images/cat3.jpg'
   ];
   final images = isPet ? petImages : humanPetImages;
-  final price = isPet ? '299' : '599';
 
   return GestureDetector(
     onTap: () => context.push('/package-detail'),
     child: Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(images[index % images.length],
-                  fit: BoxFit.cover, width: double.infinity),
+      width: ScaleUtil.scale(281),
+      margin: EdgeInsets.only(right: ScaleUtil.scale(24)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(ScaleUtil.scale(20)),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              images[index % images.length],
+              fit: BoxFit.cover,
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withOpacity(0.0),
+                    Colors.black.withOpacity(0.6),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.5, 1.0],
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: ScaleUtil.scale(24),
+              left: ScaleUtil.scale(24),
+              right: ScaleUtil.scale(24),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text('套系名称',
                       style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 2),
+                          color: Colors.white,
+                          fontSize: ScaleUtil.scale(25),
+                          fontWeight: FontWeight.w400,
+                          fontFamily: "PingFang SC")),
+                  SizedBox(height: ScaleUtil.scale(4)),
                   Text('节日盛典 | 8.8万用户使用',
-                      style: TextStyle(color: Colors.white70, fontSize: 10)),
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: ScaleUtil.scale(12),
+                          fontWeight: FontWeight.w400,
+                          fontFamily: "PingFang SC")),
                 ],
               ),
-              Row(
-                children: [
-                  const Icon(Icons.ac_unit, color: Colors.yellow, size: 16),
-                  const SizedBox(width: 2),
-                  Text(price,
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     ),
   );
