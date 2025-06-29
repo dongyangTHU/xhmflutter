@@ -35,6 +35,10 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
   late PageController _pageController;
   int _currentPage = _infiniteScrollInitialPage;
   Timer? _bannerTimer;
+  
+  // --- 新增状态变量 ---
+  bool _isUserInteracting = false; // 用户是否正在手动滑动
+  bool _isCreationFlowOpen = false; // 拍摄信息确认是否打开
 
   final String _packageName = '套系名称';
   final String _packagePrice = '299';
@@ -59,7 +63,8 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
 
   void _startBannerTimer() {
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!mounted || !_pageController.hasClients) return;
+      // --- 优化：只有在用户没有手动滑动时才自动切换 ---
+      if (!mounted || !_pageController.hasClients || _isUserInteracting) return;
       final nextPage = _currentPage + 1;
       _pageController.animateToPage(
         nextPage,
@@ -70,15 +75,32 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
   }
 
   void _showCreationFlow() {
+    setState(() {
+      _isCreationFlowOpen = true;
+    });
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.1),
       builder: (context) => _CreationFlowSheet(
         packageName: _packageName,
         packagePrice: _packagePrice,
+        onClose: () {
+          setState(() {
+            _isCreationFlowOpen = false;
+            _sheetExtent = _minSheetSize;
+          });
+        },
       ),
-    );
+    ).then((_) {
+      // 当弹窗关闭时，重置状态
+      setState(() {
+        _isCreationFlowOpen = false;
+        _sheetExtent = _minSheetSize;
+      });
+    });
   }
 
   double _scale(BuildContext context, double figmaValue) {
@@ -101,6 +123,10 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
       body: Stack(
         children: [
           _buildBackgroundSlider(),
+          // --- 任务1: 添加顶部渐变蒙层 ---
+          _buildTopGradientOverlay(),
+          // --- 新增：正片叠底黑色效果 ---
+          if (_isCreationFlowOpen) _buildOverlayMask(),
           NotificationListener<DraggableScrollableNotification>(
             onNotification: (notification) {
               setState(() {
@@ -116,6 +142,42 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
     );
   }
 
+  // --- 新增：正片叠底黑色效果 Widget ---
+  Widget _buildOverlayMask() {
+    return Container(
+      color: Colors.black.withOpacity(0.8), // 正片叠底黑色效果
+    );
+  }
+
+  // --- 新增: 顶部渐变蒙层 Widget ---
+  Widget _buildTopGradientOverlay() {
+    return Container(
+      // 这个蒙层从顶部向下提供一个渐变黑色效果，确保在明亮背景下返回按钮等UI元素清晰可见。
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          // 渐变方向：从上到下
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            // --- 自定义区域: 调整渐变颜色和不透明度 ---
+            // 1. 顶部颜色和不透明度: Colors.black.withOpacity(0.6)
+            //    - `0.6` 代表 60% 的黑色不透明度，值越高，顶部越暗。您可以修改这个值，范围是 0.0 (完全透明) 到 1.0 (完全不透明)。
+            Colors.black.withOpacity(0.3),
+
+            // 2. 底部颜色（渐变结束色）: Colors.transparent
+            //    - 通常保持为透明色，以实现平滑过渡。
+            Colors.transparent,
+          ],
+          // --- 自定义区域: 调整渐变范围 ---
+          // 3. 渐变范围: stops: [0.0, 0.3]
+          //    - `[0.0, 0.3]` 表示渐变将从屏幕的顶部 (0.0) 开始，到屏幕高度 30% (0.3) 的位置完全变为透明。
+          //    - 如果您想让渐变范围更大（例如，延伸到屏幕一半），可以将其修改为 `[0.0, 0.5]`。
+          stops: const [0.0, 0.2],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBackgroundSlider() {
     return Stack(
       alignment: Alignment.bottomCenter,
@@ -126,11 +188,27 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
           onPageChanged: (page) => setState(() => _currentPage = page),
           itemBuilder: (context, index) {
             final realIndex = index % _backgroundImages.length;
-            return Image.asset(
-              _backgroundImages[realIndex],
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
+            return GestureDetector(
+              onPanStart: (_) {
+                setState(() {
+                  _isUserInteracting = true;
+                });
+                // 暂停自动切换
+                _bannerTimer?.cancel();
+              },
+              onPanEnd: (_) {
+                setState(() {
+                  _isUserInteracting = false;
+                });
+                // 重新启动自动切换
+                _startBannerTimer();
+              },
+              child: Image.asset(
+                _backgroundImages[realIndex],
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+              ),
             );
           },
         ),
@@ -175,6 +253,11 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
       const Color.fromRGBO(0, 0, 0, 0.6),
       clampedProgress,
     );
+
+    // --- 优化：拍摄信息确认时完全隐藏底边栏 ---
+    if (_isCreationFlowOpen) {
+      return const SizedBox.shrink();
+    }
 
     return DraggableScrollableSheet(
       initialChildSize: _minSheetSize,
@@ -226,11 +309,7 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
                     ),
                     SizedBox(height: _scale(context, 24)),
                     _buildTitleAndPrice(context),
-
-                    // --- 终极修复方案 第1步: 大幅缩减外部间距 ---
-                    // 将这个主要的外部间距从 36 减小到 12
                     SizedBox(height: _scale(context, 60)),
-                    
                     Opacity(
                       opacity: clampedProgress,
                       child: Column(
@@ -242,13 +321,9 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
                               color: Colors.white,
                               fontSize: _scale(context, 41),
                               fontWeight: FontWeight.bold,
-                              // 保持行高压缩，确保文本自身不产生额外间距
                               height: 1.0,
                             ),
                           ),
-                          
-                          // --- 终极修复方案 第2步: 使用 Transform.translate 进行视觉矫正 ---
-                          // 这个小部件会将瀑布流向上强制移动一点距离，覆盖任何剩余的顽固间隙
                           Transform.translate(
                             offset: Offset(0, -_scale(context, 100.0)),
                             child: _buildUserShowcase(),
@@ -286,7 +361,6 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
                   ),
                 ),
                 SizedBox(width: _scale(context, 16)),
-                
               ],
             ),
             Row(
@@ -335,7 +409,6 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
       crossAxisSpacing: 8,
       itemBuilder: (context, index) {
         final imagePath = _userShowcaseImages[index];
-        // --- 优化 2: 添加点击放大功能 ---
         return GestureDetector(
           onTap: () {
             Navigator.push(
@@ -359,6 +432,11 @@ class _PackageDetailPageState extends State<PackageDetailPage> {
 
   Widget _buildBottomButton(BuildContext context,
       {required VoidCallback onPressed}) {
+    // --- 优化：拍摄信息确认时隐藏底边栏 ---
+    if (_isCreationFlowOpen) {
+      return const SizedBox.shrink();
+    }
+    
     return Positioned(
       left: 0,
       right: 0,
@@ -447,13 +525,11 @@ class FullScreenImageViewer extends StatelessWidget {
       backgroundColor: Colors.black,
       body: GestureDetector(
         onTap: () {
-          // 点击屏幕任何地方返回
           Navigator.pop(context);
         },
         child: Center(
           child: Image.asset(
             imagePath,
-            // fit: BoxFit.contain 可以完整显示图片，不会裁剪
             fit: BoxFit.contain,
           ),
         ),
@@ -462,18 +538,16 @@ class FullScreenImageViewer extends StatelessWidget {
   }
 }
 
-
-
-
-// ... 此处省略 _CreationFlowSheet 的代码，请确保你文件中的这部分代码保持不变 ...
-// --- Creation Flow BottomSheet Widget (REFACTORED BASED ON FIGMA V4 - STACK LAYOUT) ---
+// --- Creation Flow BottomSheet Widget (REFACTORED BASED ON FIGMA V5 - ENHANCED UX) ---
 class _CreationFlowSheet extends StatefulWidget {
   final String packageName;
   final String packagePrice;
+  final VoidCallback onClose;
 
   const _CreationFlowSheet({
     required this.packageName,
     required this.packagePrice,
+    required this.onClose,
   });
 
   @override
@@ -485,6 +559,7 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
   int _currentStep = 0;
 
   final bool _showHumanSelection = true;
+  bool _isNextButtonPressed = false;
 
   String _selectedPet = '黑八';
   String _selectedHuman = '大美女';
@@ -494,8 +569,6 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
 
   final List<String> _pets = ['黑八', '小金'];
   final List<String> _humans = ['大美女', '大帅哥'];
-  
-  // 您可以在此列表中直接修改、添加、删除或重新排序比例选项
   final List<String> _ratios = [
     '1:1', '4:3', '3:4', '16:9', '9:16', '2:1', '1:2', '3:2'
   ];
@@ -514,7 +587,7 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
     super.dispose();
   }
 
-  double _scale(double figmaValue) {
+  double _scale(BuildContext context, double figmaValue) {
     return figmaValue * (MediaQuery.of(context).size.width / 750.0);
   }
 
@@ -542,14 +615,21 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
 
     return Container(
       height: MediaQuery.of(context).size.height * sheetHeight,
-      decoration: const BoxDecoration(
+      clipBehavior: Clip.antiAlias, // 确保圆角裁切生效
+      decoration: BoxDecoration(
+        // --- 任务2: 修改背景图使其自身透明 ---
         image: DecorationImage(
-          image: AssetImage('assets/images/bg_create_step.png'),
+          image: const AssetImage('assets/images/bg_create_step.png'),
           fit: BoxFit.cover,
+          // --- 自定义区域 ---
+          // 直接控制背景图片本身的不透明度。
+          // 1.0 表示完全不透明（原始图片），0.0 表示完全透明。
+          // 您可以调整下面的 0.5 来改变背景的明暗程度。
+          opacity: 0.8,
         ),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        // 原有的通过渐变叠加控制暗度的方法已被移除。
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      // --- 修改: 移除 Column 和 AppBar, 直接使用 PageView ---
       child: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
@@ -564,20 +644,16 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
     );
   }
 
-  // AppBar 已被移除，其功能集成到 _buildStepWrapper 中
-
   Widget _buildInfoConfirmationStep() {
     return _buildStepWrapper(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 修改: 使用 Padding 控制顶部距离，而非 Transform ---
-          // 您可以安全地调整这里的 top 值来控制标题与上边缘的距离
           Padding(
-            padding: EdgeInsets.only(top: _scale(60.0)),
+            padding: EdgeInsets.only(top: _scale(context, 70.0)),
             child: _buildSectionHeader('拍摄信息确认', '更直观更快捷选择喜欢的风格'),
           ),
-          SizedBox(height: _scale(48)),
+          SizedBox(height: _scale(context, 48)),
           _buildChoiceSection(
             title: '选择宠物',
             options: _pets,
@@ -585,7 +661,7 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
             onSelect: (v) => setState(() => _selectedPet = v),
           ),
           if (_showHumanSelection) ...[
-            SizedBox(height: _scale(35)),
+            SizedBox(height: _scale(context, 48)),
             _buildChoiceSection(
               title: '选择人像',
               options: _humans,
@@ -593,27 +669,30 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
               onSelect: (v) => setState(() => _selectedHuman = v),
             ),
           ],
-          SizedBox(height: _scale(35)),
+          SizedBox(height: _scale(context, 48)),
           _buildRatioSelectionList(),
         ],
       ),
       onNext: _nextPage,
     );
   }
-  
-  // 其他步骤的构建方法也应使用新的 Wrapper 结构
+
   Widget _buildDiyContentStep() {
-    return _buildStepWrapper(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-         children: [
-          Padding(
-            padding: EdgeInsets.only(top: _scale(70.0)),
-            child: _buildSectionHeader('DIY内容', '自选喜欢的画面内容'),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
+    // 静态标签数据
+    final List<String> envTags = [
+      '温馨的壁炉旁', '洒满阳光的窗台', '舒适的沙发上', '蓬松的地毯上', '被鲜花包围', '泡泡浴缸中', '艺术画廊中', '复古书房中'
+    ];
+    final List<String> itemTags = [
+      '墨镜', '花环', '蝴蝶结领结', '小丝巾', '生日帽', '皇冠', '珍珠项链', '毛线帽', '草帽', '天使光环'
+    ];
+    final List<String> actionTags = [
+      '歪头杀', '微笑', '眨眼', '吐舌头', '打哈气', '好奇的看着你'
+    ];
+
+    return _DiyContentStep(
+      envTags: envTags,
+      itemTags: itemTags,
+      actionTags: actionTags,
       onNext: _nextPage,
     );
   }
@@ -622,9 +701,9 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
     return _buildStepWrapper(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-         children: [
+        children: [
           Padding(
-            padding: EdgeInsets.only(top: _scale(70.0)),
+            padding: EdgeInsets.only(top: _scale(context, 70.0)),
             child: _buildSectionHeader('画风选择', '自选喜欢的画面风格'),
           ),
           const SizedBox(height: 24),
@@ -640,14 +719,17 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-           Padding(
-            padding: EdgeInsets.only(top: _scale(70.0)),
+          Padding(
+            padding: EdgeInsets.only(top: _scale(context, 70.0)),
             child: _buildSectionHeader('拍摄确认', ''),
           ),
         ],
       ),
       centerWidget: FloatingActionButton(
-        onPressed: () => context.pop(),
+        onPressed: () {
+          widget.onClose(); // 调用父组件的onClose回调
+          Navigator.pop(context); // 关闭弹窗
+        },
         backgroundColor: const Color(0xFF7A5CFA),
         child: const Text('生成',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -657,7 +739,6 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
 
   // --- 辅助组件 (Helper Widgets) ---
 
-  // --- 修改: _buildStepWrapper 现在是布局的基石，包含 Stack ---
   Widget _buildStepWrapper({
     required Widget child,
     VoidCallback? onNext,
@@ -666,22 +747,21 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
   }) {
     return Stack(
       children: [
-        // 主要内容和底部按钮
         Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: _scale(40)),
+                padding: EdgeInsets.symmetric(horizontal: _scale(context, 40)),
                 child: child,
               ),
             ),
             _buildProgressIndicator(),
-            SizedBox(height: _scale(20)),
+            SizedBox(height: _scale(context, 20)),
             Padding(
               padding: EdgeInsets.only(
-                left: _scale(40),
-                right: _scale(40),
-                bottom: _scale(40),
+                left: _scale(context, 40),
+                right: _scale(context, 40),
+                bottom: _scale(context, 40),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -694,11 +774,25 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
             )
           ],
         ),
-        // 返回按钮，自由地放置在左上角
+        // --- 新增：关闭按钮 ---
+        Positioned(
+          top: _scale(context, 70.0) + _scale(context, 20), // 与标题文字居中对齐
+          right: _scale(context, 20),
+          child: Container(
+            height: _scale(context, 34 * 1.2), // 与标题文字高度一致
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white70),
+              onPressed: () {
+                widget.onClose(); // 调用父组件的onClose回调
+                Navigator.pop(context); // 关闭弹窗
+              },
+            ),
+          ),
+        ),
         if (_currentStep > 0)
           Positioned(
-            top: _scale(20),
-            left: _scale(20),
+            top: _scale(context, 20),
+            left: _scale(context, 20),
             child: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
               onPressed: _previousPage,
@@ -709,20 +803,20 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
   }
 
   Widget _buildProgressIndicator() {
-     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: _scale(80), vertical: _scale(20)),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: _scale(context, 80), vertical: _scale(context, 20)),
       child: Row(
         children: List.generate(4, (index) {
           final bool isActive = index <= _currentStep;
           return Expanded(
             child: Container(
-              margin: EdgeInsets.symmetric(horizontal: _scale(6)),
-              height: _scale(8),
+              margin: EdgeInsets.symmetric(horizontal: _scale(context, 6)),
+              height: _scale(context, 8),
               decoration: BoxDecoration(
                 color: isActive
                     ? const Color(0xFFD5B2FF)
                     : Colors.white.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(_scale(4)),
+                borderRadius: BorderRadius.circular(_scale(context, 4)),
               ),
             ),
           );
@@ -733,34 +827,50 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
 
   Widget _buildNextButton({required VoidCallback? onPressed}) {
     return GestureDetector(
-      onTap: onPressed,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Image.asset(
-            'assets/images/button_create_step.png',
-            width: _scale(542),
-            height: _scale(90),
-            fit: BoxFit.contain,
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset('assets/images/ic_home_1.png',
-                  width: _scale(48), height: _scale(48)),
-              SizedBox(width: _scale(16)),
-              Text(
-                '下一步',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'PingFang SC',
-                  fontSize: _scale(34),
-                  fontWeight: FontWeight.w400,
-                ),
+      onTapDown: (_) => setState(() => _isNextButtonPressed = true),
+      onTapUp: (_) {
+        setState(() => _isNextButtonPressed = false);
+        Future.delayed(const Duration(milliseconds: 150), () {
+          onPressed?.call();
+        });
+      },
+      onTapCancel: () => setState(() => _isNextButtonPressed = false),
+      child: AnimatedScale(
+        scale: _isNextButtonPressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeInOut,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Image.asset(
+              'assets/images/button_create_step.png',
+              width: _scale(context, 542),
+              height: _scale(context, 90),
+              fit: BoxFit.contain,
+            ),
+            AnimatedOpacity(
+              opacity: _isNextButtonPressed ? 0.7 : 1.0,
+              duration: const Duration(milliseconds: 150),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset('assets/images/ic_home_1.png',
+                      width: _scale(context, 48), height: _scale(context, 48)),
+                  SizedBox(width: _scale(context, 16)),
+                  Text(
+                    '下一步',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'PingFang SC',
+                      fontSize: _scale(context, 34),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -773,15 +883,15 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
             style: TextStyle(
                 color: Colors.white,
                 fontFamily: "PingFang SC",
-                fontSize: _scale(34 * 1.2),
+                fontSize: _scale(context, 34 * 1.2),
                 fontWeight: FontWeight.w400)),
         if (subtitle.isNotEmpty) ...[
-          SizedBox(height: _scale(8)),
+          SizedBox(height: _scale(context, 8)),
           Text(subtitle,
               style: TextStyle(
                   color: Colors.white.withOpacity(0.4),
                   fontFamily: "PingFang SC",
-                  fontSize: _scale(21 * 1.2),
+                  fontSize: _scale(context, 21 * 1.2),
                   fontWeight: FontWeight.w400)),
         ]
       ],
@@ -789,7 +899,7 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
   }
 
   Widget _buildRatioSelectionList() {
-    final double itemBaseHeight = _scale(62 * 1.2 * 1.3);
+    final double itemBaseHeight = _scale(context, 62 * 1.2 * 1.3);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -797,9 +907,9 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
             style: TextStyle(
                 color: const Color(0xFFD5B2FF),
                 fontFamily: "Inter",
-                fontSize: _scale(21 * 1.2),
+                fontSize: _scale(context, 21 * 1.2),
                 fontWeight: FontWeight.w400)),
-        SizedBox(height: _scale(24)),
+        SizedBox(height: _scale(context, 24)),
         SizedBox(
           height: itemBaseHeight,
           child: ListView.builder(
@@ -827,12 +937,12 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
     return GestureDetector(
       onTap: () => onSelect(label),
       child: Padding(
-        padding: EdgeInsets.only(right: _scale(24)),
+        padding: EdgeInsets.only(right: _scale(context, 24)),
         child: Container(
           width: width,
           height: height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(_scale(8)),
+            borderRadius: BorderRadius.circular(_scale(context, 8)),
             border: Border.all(
               color: isSelected
                   ? const Color(0xFFD5B2FF)
@@ -846,7 +956,7 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
               style: TextStyle(
                 color:
                     isSelected ? Colors.white : Colors.white.withOpacity(0.6),
-                fontSize: _scale(24 * 1.2),
+                fontSize: _scale(context, 24 * 1.2),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -869,12 +979,12 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
             style: TextStyle(
                 color: const Color(0xFFD5B2FF),
                 fontFamily: "Inter",
-                fontSize: _scale(21 * 1.2),
+                fontSize: _scale(context, 21 * 1.2),
                 fontWeight: FontWeight.w400)),
-        SizedBox(height: _scale(24)),
+        SizedBox(height: _scale(context, 24)),
         Wrap(
-          spacing: _scale(35),
-          runSpacing: _scale(24),
+          spacing: _scale(context, 35),
+          runSpacing: _scale(context, 24),
           children: options.map((option) {
             final isSelected = currentValue == option;
             return _buildCircle(option, isSelected, onSelect);
@@ -891,25 +1001,378 @@ class _CreationFlowSheetState extends State<_CreationFlowSheet> {
       child: Column(
         children: [
           Container(
-            width: _scale(74.5 * 1.2),
-            height: _scale(74.5 * 1.2),
+            width: _scale(context, 74.5 * 1.2),
+            height: _scale(context, 74.5 * 1.2),
             decoration: BoxDecoration(
               color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
               shape: BoxShape.circle,
               border: isSelected
                   ? Border.all(
-                      color: const Color(0xFFD5B2FF), width: _scale(5))
+                      color: const Color(0xFFD5B2FF), width: _scale(context, 5))
                   : null,
             ),
           ),
-          SizedBox(height: _scale(16)),
+          SizedBox(height: _scale(context, 16)),
           Text(label,
               style: TextStyle(
                   color: Colors.white,
-                  fontSize: _scale(21 * 1.2),
+                  fontSize: _scale(context, 21 * 1.2),
                   fontFamily: "PingFang SC")),
         ],
       ),
+    );
+  }
+}
+
+// 新增 DIY内容页组件
+class _DiyContentStep extends StatefulWidget {
+  final List<String> envTags;
+  final List<String> itemTags;
+  final List<String> actionTags;
+  final VoidCallback onNext;
+  const _DiyContentStep({
+    required this.envTags,
+    required this.itemTags,
+    required this.actionTags,
+    required this.onNext,
+  });
+  @override
+  State<_DiyContentStep> createState() => _DiyContentStepState();
+}
+
+class _DiyContentStepState extends State<_DiyContentStep> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  final List<String> _customTags = [];
+  final Set<String> _selectedTags = {};
+  String? _errorText;
+
+  double _scale(BuildContext context, double figmaValue) {
+    return figmaValue * (MediaQuery.of(context).size.width / 750.0);
+  }
+
+  void _tryAddCustomTag() {
+    String text = _controller.text.trim();
+    if (text.isEmpty) return;
+    if (text.length > 10) text = text.substring(0, 10);
+    if (_selectedTags.length >= 3) {
+      setState(() {
+        _errorText = '最多选择3个';
+      });
+      return;
+    }
+    if (_customTags.contains(text)) {
+      setState(() {
+        _errorText = '已添加';
+      });
+      return;
+    }
+    setState(() {
+      _customTags.insert(0, text);
+      _selectedTags.add(text);
+      _controller.clear();
+      _errorText = null;
+    });
+    _focusNode.unfocus();
+  }
+
+  void _onTagTap(String tag) {
+    setState(() {
+      if (_selectedTags.contains(tag)) {
+        _selectedTags.remove(tag);
+        _errorText = null;
+      } else {
+        if (_selectedTags.length >= 3) {
+          _errorText = '最多选择3个';
+        } else {
+          _selectedTags.add(tag);
+          _errorText = null;
+        }
+      }
+    });
+  }
+
+  Widget _buildInputField() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: _scale(context, 47.27),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment(-1, 0), end: Alignment(1, 0),
+                colors: [
+                  Color.fromRGBO(255,255,255,0.20),
+                  Color.fromRGBO(255,255,255,0.10),
+                  Color.fromRGBO(255,255,255,0.10),
+                  Color.fromRGBO(255,255,255,0.20),
+                ],
+                stops: [0, 0.34, 0.69, 1],
+              ),
+              borderRadius: BorderRadius.circular(_scale(context, 24)),
+              border: Border.all(
+                color: const Color.fromRGBO(255,255,255,0.40),
+                width: 1,
+              ),
+            ),
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              maxLength: 10,
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Inter',
+                fontSize: _scale(context, 18),
+                fontWeight: FontWeight.w400,
+              ),
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: '或输入自定义内容，回车添加',
+                hintStyle: TextStyle(
+                  color: const Color(0xFFB2B2B2),
+                  fontFamily: 'Inter',
+                  fontSize: _scale(context, 18),
+                  fontWeight: FontWeight.w400,
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: _scale(context, 20)),
+              ),
+              onSubmitted: (_) => _tryAddCustomTag(),
+              onChanged: (_) {
+                setState(() {
+                  _errorText = null;
+                });
+              },
+            ),
+          ),
+        ),
+        SizedBox(width: _scale(context, 16)),
+        GestureDetector(
+          onTap: _tryAddCustomTag,
+          child: Container(
+            width: _scale(context, 120),
+            height: _scale(context, 47.27),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment(-1, 0), end: Alignment(1, 0),
+                colors: [
+                  Color.fromRGBO(255,255,255,0.20),
+                  Color.fromRGBO(255,255,255,0.10),
+                  Color.fromRGBO(255,255,255,0.10),
+                  Color.fromRGBO(255,255,255,0.20),
+                ],
+                stops: [0, 0.34, 0.69, 1],
+              ),
+              borderRadius: BorderRadius.circular(_scale(context, 24)),
+              border: Border.all(
+                color: const Color.fromRGBO(255,255,255,0.40),
+                width: 1,
+              ),
+            ),
+            child: Text('添加',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Inter',
+                fontSize: _scale(context, 18),
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroup(String title, List<String> tags) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+          style: TextStyle(
+            color: const Color(0xFFD5B2FF),
+            fontFamily: 'Inter',
+            fontSize: _scale(context, 21),
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        SizedBox(height: _scale(context, 20)),
+        Wrap(
+          spacing: _scale(context, 20),
+          runSpacing: _scale(context, 16),
+          children: [
+            ..._customTags.map((tag) => _buildTag(tag, true)),
+            ...tags.map((tag) => _buildTag(tag, false)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTag(String tag, bool isCustom) {
+    final bool selected = _selectedTags.contains(tag);
+    return GestureDetector(
+      onTap: () => _onTagTap(tag),
+      child: Container(
+        constraints: BoxConstraints(
+          minWidth: _scale(context, 80),
+          maxWidth: _scale(context, 180),
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: _scale(context, 24),
+          vertical: _scale(context, 10),
+        ),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment(-1, 0), end: Alignment(1, 0),
+            colors: [
+              Color.fromRGBO(255,255,255,0.20),
+              Color.fromRGBO(255,255,255,0.10),
+              Color.fromRGBO(255,255,255,0.10),
+              Color.fromRGBO(255,255,255,0.20),
+            ],
+            stops: [0, 0.34, 0.69, 1],
+          ),
+          borderRadius: BorderRadius.circular(_scale(context, 24)),
+          border: Border.all(
+            color: selected ? const Color(0xFFD5B2FF) : const Color.fromRGBO(255,255,255,0.40),
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          tag,
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: 'Inter',
+            fontSize: _scale(context, 18),
+            fontWeight: FontWeight.w400,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  // 提取包装方法，静态辅助，传 context
+  static Widget buildStepWrapper({
+    required BuildContext context,
+    required Widget child,
+    VoidCallback? onNext,
+    bool showNextButton = true,
+    Widget? centerWidget,
+  }) {
+    // 直接复用 _CreationFlowSheetState 的 _buildStepWrapper 逻辑
+    double _scale(BuildContext context, double figmaValue) {
+      return figmaValue * (MediaQuery.of(context).size.width / 750.0);
+    }
+    final _CreationFlowSheetState? parent = context.findAncestorStateOfType<_CreationFlowSheetState>();
+    final int? currentStep = parent?._currentStep;
+    return Stack(
+      children: [
+        Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: _scale(context, 40)),
+                child: child,
+              ),
+            ),
+            if (parent != null) parent._buildProgressIndicator(),
+            SizedBox(height: _scale(context, 20)),
+            Padding(
+              padding: EdgeInsets.only(
+                left: _scale(context, 40),
+                right: _scale(context, 40),
+                bottom: _scale(context, 40),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (centerWidget != null) centerWidget,
+                  if (showNextButton && centerWidget == null)
+                    parent != null ? parent._buildNextButton(onPressed: onNext) : const SizedBox.shrink(),
+                ],
+              ),
+            )
+          ],
+        ),
+        // --- 新增：关闭按钮 ---
+        Positioned(
+          top: _scale(context, 70.0) + _scale(context, 20),
+          right: _scale(context, 20),
+          child: Container(
+            height: _scale(context, 34 * 1.2),
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white70),
+              onPressed: () {
+                if (parent != null) {
+                  parent.widget.onClose();
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ),
+        ),
+        if (parent != null && currentStep != null && currentStep > 0)
+          Positioned(
+            top: _scale(context, 20),
+            left: _scale(context, 20),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
+              onPressed: parent._previousPage,
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return buildStepWrapper(
+      context: context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: _scale(context, 70.0)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('DIY内容',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: "Inter",
+                    fontSize: _scale(context, 34),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                SizedBox(height: _scale(context, 8)),
+                Text('自选喜欢的画面内容',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: "Inter",
+                    fontSize: _scale(context, 21),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: _scale(context, 32)),
+          _buildInputField(),
+          if (_errorText != null) ...[
+            SizedBox(height: _scale(context, 8)),
+            Text(_errorText!, style: TextStyle(color: Colors.red, fontSize: _scale(context, 18))),
+          ],
+          SizedBox(height: _scale(context, 32)),
+          _buildGroup('环境', widget.envTags),
+          SizedBox(height: _scale(context, 32)),
+          _buildGroup('物品', widget.itemTags),
+          SizedBox(height: _scale(context, 32)),
+          _buildGroup('动作', widget.actionTags),
+        ],
+      ),
+      onNext: widget.onNext,
     );
   }
 }

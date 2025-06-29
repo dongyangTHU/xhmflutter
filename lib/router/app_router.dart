@@ -72,14 +72,15 @@ GoRouter createAppRouter(BuildContext context) {
             builder: (context, state) => const HomeFlowPage(),
           ),
           GoRoute(
+            path: '/creation-store',
+            builder: (context, state) => const CreationStorePage(),
+          ),
+          GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfilePage(),
           ),
         ],
       ),
-      GoRoute(
-          path: '/creation-store',
-          builder: (context, state) => const CreationStorePage()),
       GoRoute(
           path: '/membership-recharge',
           builder: (context, state) => const MembershipRechargePage()),

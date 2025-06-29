@@ -185,6 +185,26 @@ class _HomePageState extends State<HomePage> {
             Container(
               color: Colors.black.withOpacity(_overlayOpacity),
             ),
+            // 顶部渐变蒙层，自动适配高度，覆盖TopBar及充值区域
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 300, // 可根据实际TopBar高度调整
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.2),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 1.0],
+                  ),
+                ),
+              ),
+            ),
             RefreshIndicator(
               onRefresh: _fetchData,
               child: CustomScrollView(
@@ -320,7 +340,7 @@ class _HomePageState extends State<HomePage> {
         "Banner Tapped: title=${banner.title}, type=${banner.bannerType}");
     switch (banner.bannerType) {
       case '2':
-        context.push('/creation-store');
+        context.go('/creation-store');
         break;
       case '3':
         context.push('/membership-recharge');
@@ -524,7 +544,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 24),
           GestureDetector(
             onTap: () {
-              context.push('/creation-store');
+              context.go('/creation-store');
             },
             child: SizedBox(
               width: 200,

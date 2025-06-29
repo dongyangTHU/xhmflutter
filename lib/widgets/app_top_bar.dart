@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/user_viewmodel.dart';
+import 'dart:math' as math;
 
 class AppTopBar extends StatelessWidget {
   const AppTopBar({super.key});
@@ -34,79 +35,91 @@ class AppTopBar extends StatelessWidget {
             ],
           ),
 
-          // --- 右侧余额和充值按钮：像素级微调 ---
+          // --- 右侧余额和充值按钮：边框宽度刚好包裹内容，右端和按钮100%契合，数字最多8位 ---
           Consumer<UserViewModel>(
             builder: (context, userViewModel, child) {
               final balance = userViewModel.userInfo?.balance ?? '...';
-              const double buttonHeight = 44;
-              final double buttonWidth = buttonHeight * svgAspectRatio;
+              String displayBalance;
+              if (balance.length > 8) {
+                displayBalance = balance.substring(0, 8) + '...';
+              } else {
+                displayBalance = balance;
+              }
+              final textPainter = TextPainter(
+                text: TextSpan(
+                  text: displayBalance,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                textDirection: TextDirection.ltr,
+              );
+              textPainter.layout();
+              final balanceTextWidth = textPainter.width;
+
+              const double iconWidth = 24;
+              const double iconPadding = 8;
+              const double buttonWidth = 64;
+              const double borderLeftPadding = 20; // 可调
+              const double borderHeight = 44;
+              final double borderWidth = borderLeftPadding + iconWidth + iconPadding + balanceTextWidth + iconPadding + buttonWidth;
 
               return SizedBox(
-                height: buttonHeight,
-                width: buttonWidth,
+                height: borderHeight,
+                width: borderWidth,
                 child: Stack(
-                  alignment: Alignment.center,
                   children: [
-                    // 1. 渲染最外层的白色边框 (无填充)
-                    SvgPicture.asset(
-                      'assets/svgs/recharge_button_border.svg',
-                      height: buttonHeight,
-                      width: buttonWidth,
+                    // 用自定义画板绘制边框
+                    CustomPaint(
+                      size: Size(borderWidth, borderHeight),
+                      painter: _BorderPainter(),
                     ),
-
-                    // 2. 使用Stack来精确定位内部元素
-                    Stack(
+                    // 内容居中对齐
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // 左对齐的内容: 图标 + 余额
+                        SizedBox(width: borderLeftPadding),
                         Align(
-                          alignment: Alignment.centerLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 16.0),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 24.04,
-                                  height: 24.01,
-                                  child: Image.asset(
-                                    'assets/images/ic_currency_diamond.png',
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  balance,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                          alignment: Alignment.center,
+                          child: Image.asset('assets/images/ic_currency_diamond.png', width: iconWidth, height: iconWidth, color: Colors.white),
+                        ),
+                        SizedBox(width: iconPadding),
+                        SizedBox(
+                          width: balanceTextWidth,
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              displayBalance,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              textAlign: TextAlign.left,
                             ),
                           ),
                         ),
-
-                        // 右对齐的内容: 使用Positioned和Transform进行像素级微调
-                        Positioned(
-                          top: 0,
-                          bottom: 0,
-                          // 通过设置负值right，强制消除SVG内部右侧的透明边距
-                          right: -5.0,
-                          child: GestureDetector(
-                            onTap: () {
-                              context.push('/membership-recharge');
-                            },
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/svgs/recharge_button.svg',
-                                ),
-                                // 使用Transform.translate微调文字位置，实现完美居中
-                                Transform.translate(
-                                  offset: const Offset(0, -1.5), // 垂直方向向上微调1.5像素
+                        SizedBox(width: iconPadding),
+                        // 充值按钮和右端边框完全重合，且高度与边框一致
+                        SizedBox(
+                          width: buttonWidth,
+                          height: borderHeight,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              SvgPicture.asset(
+                                'assets/svgs/recharge_button.svg',
+                                height: borderHeight, // 让按钮SVG高度与边框一致
+                                fit: BoxFit.fill,
+                              ),
+                              Align(
+                                alignment: Alignment.center,
+                                child: GestureDetector(
+                                  onTap: () => context.push('/membership-recharge'),
                                   child: const Text(
                                     '充值',
                                     style: TextStyle(
@@ -116,8 +129,8 @@ class AppTopBar extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -131,4 +144,27 @@ class AppTopBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BorderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.transparent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    paint.color = Colors.white;
+
+    // 参考SVG的path，动态生成左、右端圆角矩形
+    final double w = size.width;
+    final double h = size.height;
+    final double r = math.min(h / 2, 36); // 圆角半径
+    final rect = Rect.fromLTWH(1, 1, w - 2, h - 2);
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(r)));
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

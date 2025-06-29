@@ -11,6 +11,7 @@ import '../viewmodels/user_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../models/api_response.dart';
 import '../models/banner_entity.dart';
+import '../widgets/main_scaffold.dart';
 
 // --- 屏幕适配工具 (无变化) ---
 class ScaleUtil {
@@ -62,43 +63,45 @@ class _CreationStorePageState extends State<CreationStorePage> with SingleTicker
   Widget build(BuildContext context) {
     ScaleUtil.init(context);
 
-    // --- 核心修复：使用 Stack 作为根 Widget 来确保背景图在最底层 ---
-    return Stack(
-      children: [
-        // 背景层
-        Image.asset(
-          'assets/images/bg_create_store.png',
-          // 确保图片填满整个屏幕
-          width: double.infinity,
-          height: double.infinity,
-          fit: BoxFit.cover,
-        ),
-        // 内容层
-        Scaffold(
-          // 必须将 Scaffold 的背景设置为透明，否则它会覆盖 Stack 底层的图片
-          backgroundColor: Colors.transparent,
-          body: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                _buildCustomHeader(),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      _tabController.value = index == 0 ? 'pet' : 'human_pet';
-                    },
-                    children: const [
-                      PetPhotoView(),
-                      HumanPetPhotoView(),
-                    ],
+    // --- 使用 MainScaffold 包装整个页面以显示底部导航栏 ---
+    return MainScaffold(
+      child: Stack(
+        children: [
+          // 背景层
+          Image.asset(
+            'assets/images/bg_create_store.png',
+            // 确保图片填满整个屏幕
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.cover,
+          ),
+          // 内容层
+          Scaffold(
+            // 必须将 Scaffold 的背景设置为透明，否则它会覆盖 Stack 底层的图片
+            backgroundColor: Colors.transparent,
+            body: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  _buildCustomHeader(),
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      onPageChanged: (index) {
+                        _tabController.value = index == 0 ? 'pet' : 'human_pet';
+                      },
+                      children: const [
+                        PetPhotoView(),
+                        HumanPetPhotoView(),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -349,7 +352,7 @@ class _PetPhotoViewState extends State<PetPhotoView> with AutomaticKeepAliveClie
           _buildSection(context, '优惠', '超值限时特价套系', isPet: true),
           SizedBox(height: ScaleUtil.scale(48)),
           _buildSection(context, '萌宠日常', '记录宠物的每个可爱瞬间', isPet: true),
-          SizedBox(height: ScaleUtil.scale(40)),
+          SizedBox(height: ScaleUtil.scale(120)), // 增加底部间距，为底部导航栏留出空间
         ],
       ),
     );
@@ -455,7 +458,7 @@ class HumanPetPhotoView extends StatelessWidget {
           _buildSection(context, '热门', '时下最喜爱的套系', isPet: false),
           SizedBox(height: ScaleUtil.scale(48)),
           _buildSection(context, '优惠', '超值限时特价套系', isPet: false),
-          SizedBox(height: ScaleUtil.scale(40)),
+          SizedBox(height: ScaleUtil.scale(120)), // 增加底部间距，为底部导航栏留出空间
         ],
       ),
     );
